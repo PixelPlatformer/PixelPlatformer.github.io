@@ -3,26 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Platformer: Rare Items</title>
+    <title>Pixel Platformer: Collision Update</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tiny5&display=swap" rel="stylesheet">
     
     <style>
         /* --- GLOBAL --- */
-        body { 
-            margin: 0; 
-            background: #202028; 
-            color: #fff; 
-            font-family: 'Tiny5', sans-serif; 
-            overflow: hidden; 
-            cursor: crosshair; 
-        }
+        body { margin: 0; background: #111; color: #fff; font-family: 'Tiny5', sans-serif; overflow: hidden; cursor: crosshair; }
         
+        /* --- PARTICLES (MENU BG) --- */
+        #menu-bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+
         /* --- GAME CANVAS --- */
         #gameCanvas { 
             display: none; 
             margin: 0 auto; 
-            background: #87CEEB; /* SKY BLUE */
+            background: #87CEEB; /* SKY BLUE GAME BG */
             border: 4px solid #fff; 
             position: relative; 
             z-index: 10; 
@@ -30,44 +26,40 @@
         }
 
         /* --- UI ELEMENTS --- */
-        .neon-text { color: #fff; text-shadow: 2px 2px 0 #000; }
+        .neon-text { color: #fff; text-shadow: 0 0 10px #00d2ff, 0 0 20px #00d2ff; }
         
         /* MENUS */
         .menu-screen { 
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             text-align: center; display: none; z-index: 100; min-width: 400px;
-            background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; border: 2px solid #fff;
+            background: rgba(0,0,0,0.9); padding: 30px; border: 2px solid #00d2ff; box-shadow: 0 0 20px #00d2ff;
         }
         #main-menu { display: block; }
 
         .btn { 
-            background: #fff; color: #000; border: 2px solid #000; 
+            background: #000; color: #fff; border: 2px solid #00d2ff; 
             padding: 15px 30px; font-family: 'Tiny5'; font-size: 24px; cursor: pointer; margin: 10px 0;
             text-transform: uppercase; transition: 0.2s; display: block; width: 100%;
         }
-        .btn:hover { background: #00d2ff; color: #fff; border-color: #fff; }
+        .btn:hover { background: #00d2ff; color: #000; box-shadow: 0 0 15px #00d2ff; }
+        .btn:disabled { border-color: #555; color: #555; cursor: not-allowed; box-shadow: none; }
 
         input { 
-            background: #222; color: #fff; border: 2px solid #fff;
+            background: #000; color: #fff; border: 2px solid #00d2ff;
             font-family: 'Tiny5'; font-size: 24px; padding: 10px; text-align: center; outline: none; width: 100%; margin-bottom: 10px;
             box-sizing: border-box;
         }
 
-        /* IN-GAME UI */
+        /* UI LAYERS */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; z-index: 20; }
-        
         #scoreboard { position: absolute; top: 20px; right: 20px; text-align: right; }
-        .score-entry { font-size: 24px; color: #fff; text-shadow: 1px 1px 0 #000; margin-bottom: 5px; }
-
-        #power-display { position: absolute; top: 20px; left: 20px; font-size: 20px; color: #ffff00; text-shadow: 1px 1px 0 #000; }
-
+        .score-entry { font-size: 24px; color: #fff; text-shadow: 2px 2px 0 #000; margin-bottom: 5px; }
+        #power-display { position: absolute; top: 20px; left: 20px; font-size: 20px; color: #ffff00; text-shadow: 2px 2px 0 #000; }
         #rng-box {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
             background: rgba(0,0,0,0.6); border: 2px solid #fff; padding: 10px 30px;
             text-align: center; pointer-events: auto; cursor: pointer;
         }
-
-        /* RARE ITEM WARNING */
         #rare-warning {
             position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
             color: #ff00ff; font-size: 20px; text-shadow: 0 0 5px #fff;
@@ -78,8 +70,10 @@
 </head>
 <body>
 
+    <canvas id="menu-bg-canvas"></canvas>
+
     <div id="main-menu" class="menu-screen">
-        <h1 class="neon-text" style="font-size: 60px; margin-bottom: 20px;">SKY ISLAND</h1>
+        <h1 class="neon-text" style="font-size: 60px; margin-bottom: 20px;">PIXEL PLATFORMER</h1>
         <label style="font-size: 18px; color: #aaa;">ENTER NAME:</label>
         <input type="text" id="player-name-input" placeholder="Guest" maxlength="10">
         <button class="btn" onclick="setupHost()">HOST GAME</button>
@@ -108,25 +102,62 @@
             <div class="score-entry" style="color: #ff4444;" id="score-enemy-display">OPP: 0</div>
         </div>
         <div id="power-display">POWER: NONE</div>
-        
         <div id="rare-warning">DON'T REROLL! THIS IS RARE!</div>
-        
         <div id="rng-box" onclick="spinRNG()">
             <div style="font-size: 12px; color: #fff;">CLICK FOR ITEM</div>
             <div id="item-display" style="font-size: 24px; color: #fff;">NOTHING</div>
         </div>
     </div>
 
-    <canvas id="gameCanvas" width="1000" height="600"></canvas>
+    <canvas id="gameCanvas" width="1200" height="600"></canvas>
 
 <script>
-    // --- CONFIG ---
+    // --- 0. MENU PARTICLES ---
+    const bgCanvas = document.getElementById('menu-bg-canvas');
+    const bgCtx = bgCanvas.getContext('2d');
+    let particles = [];
+    function resizeBg() { bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight; }
+    window.addEventListener('resize', resizeBg); resizeBg();
+
+    class Particle {
+        constructor() {
+            this.x = Math.random() * bgCanvas.width; this.y = Math.random() * bgCanvas.height;
+            this.size = Math.random() * 2 + 1; this.speedX = Math.random() * 0.5 - 0.25; this.speedY = Math.random() * 0.5 - 0.25;
+            this.alpha = Math.random();
+        }
+        update() {
+            this.x += this.speedX; this.y += this.speedY;
+            if (this.x < 0) this.x = bgCanvas.width; if (this.x > bgCanvas.width) this.x = 0;
+            if (this.y < 0) this.y = bgCanvas.height; if (this.y > bgCanvas.height) this.y = 0;
+        }
+        draw() {
+            bgCtx.fillStyle = `rgba(0, 210, 255, ${this.alpha})`; // Cyan particles
+            bgCtx.beginPath(); bgCtx.arc(this.x, this.y, this.size, 0, Math.PI*2); bgCtx.fill();
+        }
+    }
+    for(let i=0; i<50; i++) particles.push(new Particle());
+    function animateBg() {
+        bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+        // Fill black background for menu
+        bgCtx.fillStyle = '#000'; bgCtx.fillRect(0,0,bgCanvas.width,bgCanvas.height);
+        particles.forEach(p => { p.update(); p.draw(); });
+        requestAnimationFrame(animateBg);
+    }
+    animateBg();
+
+    // --- 1. CONFIG ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    const ISLAND_Y = 400; 
-    const ISLAND_X = 200; 
-    const ISLAND_W = 600; 
+    // MAP DESIGN (PLATFORMS)
+    // x, y, w, h
+    const PLATFORMS = [
+        { x: 100, y: 400, w: 300, h: 50 },  // Left Island
+        { x: 500, y: 350, w: 200, h: 50 },  // Middle Floating
+        { x: 800, y: 400, w: 300, h: 50 },  // Right Island
+        { x: 550, y: 250, w: 100, h: 20 },  // High Perch
+        { x: 200, y: 280, w: 20, h: 120 }   // Wall/Obstacle Left
+    ];
     
     const GRAVITY = 0.8;
     const JUMP_FORCE = -14;
@@ -139,21 +170,20 @@
     let conn = null;
     let isHost = false;
     let isGameRunning = false;
-    let canMove = false;
     let projectiles = [];
-    let beams = []; // For continuous lasers
+    let beams = []; 
     let scores = { me: 0, enemy: 0 };
     let mouseX = 0, mouseY = 0, myAngle = 0;
     
     // PLAYERS
     const ME = { 
-        x: 300, y: 200, w: 40, h: 40, vx: 0, vy: 0, 
+        x: 150, y: 300, w: 40, h: 40, vx: 0, vy: 0, 
         item: 'NOTHING', power: 'NONE', name: 'Guest', 
-        color: '#fff', facingRight: true 
+        color: '#fff', facingRight: true, meleeCooldown: 0 
     };
     
     const OTHER = { 
-        x: 700, y: 200, w: 40, h: 40, item: 'NOTHING', 
+        x: 900, y: 300, w: 40, h: 40, item: 'NOTHING', 
         name: 'Enemy', angle: 0, color: '#ff4444' 
     };
 
@@ -225,6 +255,7 @@
 
     function startGameSequence() {
         document.querySelectorAll('.menu-screen').forEach(el => el.style.display = 'none');
+        document.getElementById('menu-bg-canvas').style.display = 'none'; // Hide menu particles
         document.getElementById('ui-layer').style.display = 'block';
         canvas.style.display = 'block';
         
@@ -237,14 +268,15 @@
         
         respawn();
         isGameRunning = true;
-        canMove = true;
         gameLoop(); 
         setInterval(sendData, 20);
     }
 
     function respawn() {
-        ME.x = ISLAND_X + Math.random() * (ISLAND_W - 50);
-        ME.y = ISLAND_Y - 200;
+        // Find a random platform to spawn on
+        const plat = PLATFORMS[Math.floor(Math.random() * 3)]; // Pick one of the first 3
+        ME.x = plat.x + 20;
+        ME.y = plat.y - 100;
         ME.vx = 0; ME.vy = 0;
     }
 
@@ -274,7 +306,7 @@
                 }
             }
             if (data.type === 'HIT') applyHit(ME, data.force, data.vx, data.vy);
-            if (data.type === 'TELEPORT_OUT') { ME.y = 1500; } // Teleported to void
+            if (data.type === 'TELEPORT_OUT') { ME.y = 1500; } 
             if (data.type === 'DEATH') { scores.me++; updateScore(); }
             if (data.type === 'PROJ') projectiles.push(data.obj);
             if (data.type === 'BEAM') beams.push(data.obj);
@@ -292,59 +324,99 @@
         if (!isGameRunning) return;
 
         // PLAYER MOVEMENT
-        if (canMove) {
-            let spd = BASE_SPEED;
-            if (ME.power === 'FAST') spd *= 1.5;
-            if (ME.power === 'TANK') spd *= 0.8;
+        let spd = BASE_SPEED;
+        if (ME.power === 'FAST') spd *= 1.5;
+        if (ME.power === 'TANK') spd *= 0.8;
 
-            if (keys['a']) ME.vx = -spd;
-            else if (keys['d']) ME.vx = spd;
-            else ME.vx *= 0.8; 
+        if (keys['a']) ME.vx = -spd;
+        else if (keys['d']) ME.vx = spd;
+        else ME.vx *= 0.8; 
 
-            if (keys['w'] && onGround(ME)) ME.vy = JUMP_FORCE;
-        }
+        if (keys['w'] && onGround(ME)) ME.vy = JUMP_FORCE;
 
         ME.vy += GRAVITY; ME.x += ME.vx; ME.y += ME.vy;
 
-        // Island Collision
-        if (ME.y + ME.h > ISLAND_Y && ME.y + ME.h < ISLAND_Y + 30) {
-            if (ME.x + ME.w > ISLAND_X && ME.x < ISLAND_X + ISLAND_W) {
-                ME.y = ISLAND_Y - ME.h; ME.vy = 0;
+        // PLATFORM COLLISION
+        let grounded = false;
+        for (let p of PLATFORMS) {
+            // Check Landing (only if falling downwards)
+            if (ME.vy >= 0 && 
+                ME.y + ME.h >= p.y && ME.y + ME.h <= p.y + p.h && // Vertically aligned top
+                ME.x + ME.w > p.x && ME.x < p.x + p.w) { // Horizontally aligned
+                
+                // Ensure we were previously above it (prevents snapping from side)
+                if (ME.y + ME.h - ME.vy <= p.y + 5) {
+                    ME.y = p.y - ME.h;
+                    ME.vy = 0;
+                    grounded = true;
+                }
             }
+            
+            // Wall Collision (Optional - for simple obstacles)
+            // Just checks overlap
+             if (ME.x < p.x + p.w && ME.x + ME.w > p.x && ME.y < p.y + p.h && ME.y + ME.h > p.y) {
+                 // Simple push out - not strictly necessary for "holes", but good for walls
+                 // (Simplified for this version to focus on hole mechanics)
+             }
         }
 
-        // Void Death
+        // VOID DEATH (HOLES)
         if (ME.y > canvas.height + 200) {
             respawn(); scores.enemy++; updateScore();
             if(conn) conn.send({type: 'DEATH'});
         }
 
-        // Projectiles (Snowballs & Nukes)
+        // --- MELEE COLLISION LOGIC (Run-Into-To-Hit) ---
+        if (ME.meleeCooldown > 0) ME.meleeCooldown--;
+
+        const isMelee = (ME.item === 'NOTHING' || ME.item === 'SWORD' || ME.item === 'STICK');
+        if (isMelee && ME.meleeCooldown <= 0) {
+            // Check Overlap with Enemy
+            if (checkRectOverlap(ME.x, ME.y, ME.w, ME.h, OTHER)) {
+                // Check Aim (Are we looking at them?)
+                const dx = OTHER.x - ME.x;
+                const dy = OTHER.y - ME.y;
+                const angleToEnemy = Math.atan2(dy, dx);
+                const angleDiff = Math.abs(myAngle - angleToEnemy);
+                
+                // If aiming reasonably close to them (within ~60 degrees)
+                if (Math.abs(angleDiff) < 1.0) {
+                    // APPLY HIT
+                    let force = 10;
+                    if (ME.item === 'SWORD') force = 25;
+                    if (ME.item === 'STICK') force = 15;
+                    if (ME.power === 'STRONG') force *= 1.5;
+
+                    const knockX = Math.cos(myAngle) * force;
+                    
+                    sendHit(force, knockX, -5);
+                    ME.meleeCooldown = 30; // 0.5s Cooldown
+                }
+            }
+        }
+
+        // PROJECTILES
         projectiles.forEach((p, i) => {
             p.x += p.vx; p.y += p.vy;
             let target = (p.owner === 'ME') ? OTHER : ME;
-            
-            // Hit Check
             if (p.owner !== 'ME' && checkRectOverlap(p.x, p.y, p.size, p.size, target)) {
-                if(p.type === 'NUKE') applyHit(ME, 100, p.vx * 10, -30); // Massive Launch
-                else applyHit(ME, 10, p.vx * 2, -5); // Standard Hit
+                if(p.type === 'NUKE') applyHit(ME, 100, p.vx * 10, -30);
+                else applyHit(ME, 10, p.vx * 2, -5);
                 projectiles.splice(i, 1);
             }
-            // Remove if far off screen
             if (p.y > 1000 || p.x < -1000 || p.x > 2000) projectiles.splice(i, 1);
         });
 
-        // Beams (Laser)
+        // BEAMS
         beams.forEach((b, i) => {
             b.life--;
             if (b.owner !== 'ME') {
-                // Raycast check roughly
                 const dx = ME.x - b.sx; const dy = ME.y - b.sy;
                 const angleToMe = Math.atan2(dy, dx);
                 const angleDiff = Math.abs(b.angle - angleToMe);
                 const dist = Math.sqrt(dx*dx + dy*dy);
                 if (dist < 1200 && angleDiff < 0.1) {
-                    applyHit(ME, 2, Math.cos(b.angle)*2, Math.sin(b.angle)*2); // Continuous push
+                    applyHit(ME, 2, Math.cos(b.angle)*2, Math.sin(b.angle)*2);
                 }
             }
             if (b.life <= 0) beams.splice(i, 1);
@@ -352,16 +424,25 @@
     }
 
     function onGround(p) {
-        return (p.y + p.h === ISLAND_Y && p.x + p.w > ISLAND_X && p.x < ISLAND_X + ISLAND_W);
+        for (let plat of PLATFORMS) {
+            if (p.y + p.h === plat.y && p.x + p.w > plat.x && p.x < plat.x + plat.w) return true;
+        }
+        return false;
     }
 
     // --- DRAW ---
     function draw() {
         ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Island
-        ctx.fillStyle = '#4caf50'; ctx.fillRect(ISLAND_X, ISLAND_Y, ISLAND_W, 20);
-        ctx.fillStyle = '#5d4037'; ctx.fillRect(ISLAND_X + 10, ISLAND_Y + 20, ISLAND_W - 20, 50);
+        // PLATFORMS
+        ctx.fillStyle = '#4caf50'; // Grass Color
+        for(let p of PLATFORMS) {
+            ctx.fillRect(p.x, p.y, p.w, p.h);
+            // Optional: Draw dirt below grass
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.fillRect(p.x, p.y + 10, p.w, p.h - 10);
+            ctx.fillStyle = '#4caf50'; // Reset for next
+        }
 
         // Projectiles
         projectiles.forEach(p => {
@@ -392,26 +473,22 @@
         ctx.translate(p.x + p.w/2, p.y + p.h/2);
         let angle = isMe ? myAngle : p.angle;
         
-        // Calculate Hand Position (Orbiting)
         const handDist = 35;
         const handX = Math.cos(angle) * handDist;
         const handY = Math.sin(angle) * handDist;
         
-        // Draw Aim Line
         if (!isMe) {
             ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)'; ctx.setLineDash([5, 5]); ctx.lineWidth = 2;
             ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(angle)*200, Math.sin(angle)*200); ctx.stroke();
             ctx.setLineDash([]);
         }
 
-        // Draw Floating Hand (Square)
         ctx.translate(handX, handY);
         ctx.rotate(angle);
         
         ctx.fillStyle = color; 
         ctx.fillRect(-6, -6, 12, 12); // The Hand
         
-        // Draw Item in Hand
         if (p.item === 'SWORD') {
             ctx.fillStyle = '#ccc'; ctx.fillRect(0, -2, 40, 4);
             ctx.fillStyle = '#8B4513'; ctx.fillRect(-5, -2, 10, 4);
@@ -428,71 +505,49 @@
         } else if (p.item === 'LASER') {
             ctx.fillStyle = '#f00'; ctx.fillRect(0, -4, 20, 8);
         }
-
         ctx.restore();
     }
 
-    // --- COMBAT & RNG ---
+    // --- INPUT (RANGED ONLY) ---
     const keys = {};
     window.addEventListener('keydown', e => {
         keys[e.key.toLowerCase()] = true;
-        if (e.key === ' ' && canMove) attack(); 
+        // Spacebar ONLY triggers ranged items now
+        if (e.key === ' ' && canMove) useRangedItem(); 
         if (e.key === 'e') spinRNG();
     });
     window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-    function attack() {
+    function useRangedItem() {
+        // Melee items are handled in Update Loop (Collision)
+        if (ME.item === 'NOTHING' || ME.item === 'SWORD' || ME.item === 'STICK') return;
+
         const vx = Math.cos(myAngle);
         const vy = Math.sin(myAngle);
-        
-        if (ME.item === 'NOTHING' || ME.item === 'SWORD' || ME.item === 'STICK') {
-            let range = 60, force = 10;
-            if (ME.item === 'SWORD') { range = 90; force = 25; }
-            if (ME.item === 'STICK') { range = 80; force = 15; }
-            if (ME.power === 'STRONG') force *= 1.5;
-            
-            // Visual Slash
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(ME.x+20, ME.y+20); 
-            ctx.lineTo(ME.x+20 + vx*range, ME.y+20 + vy*range); ctx.stroke();
 
-            if (checkHit(range)) sendHit(force, vx * force, -5);
-        }
-        else if (ME.item === 'SNOWBALL' || ME.item === 'NUKE') {
+        if (ME.item === 'SNOWBALL' || ME.item === 'NUKE') {
             const isNuke = ME.item === 'NUKE';
             const spd = isNuke ? 8 : 12;
             const size = isNuke ? 20 : 10;
             const color = isNuke ? '#000' : '#fff';
             
-            const p = { 
-                x: ME.x+20, y: ME.y+20, vx: vx*spd, vy: vy*spd, 
-                owner: 'ME', type: isNuke?'NUKE':'SNOWBALL', size: size, color: color 
-            };
+            const p = { x: ME.x+20, y: ME.y+20, vx: vx*spd, vy: vy*spd, owner: 'ME', type: isNuke?'NUKE':'SNOWBALL', size: size, color: color };
             projectiles.push(p);
             if(conn) conn.send({type: 'PROJ', obj: Object.assign({}, p, {owner:'OTHER'}) });
             ME.item = 'NOTHING'; updateUI();
         }
         else if (ME.item === 'TELEPORTER') {
-            if(conn) conn.send({ type: 'TELEPORT_OUT' }); // Tell enemy to die
+            if(conn) conn.send({ type: 'TELEPORT_OUT' });
             ME.item = 'NOTHING'; updateUI();
         }
         else if (ME.item === 'LASER') {
-            const b = { sx: ME.x+20, sy: ME.y+20, angle: myAngle, life: 60, owner: 'ME' }; // Lasts 60 frames (1s)
+            const b = { sx: ME.x+20, sy: ME.y+20, angle: myAngle, life: 60, owner: 'ME' };
             beams.push(b);
             if(conn) conn.send({type: 'BEAM', obj: Object.assign({}, b, {owner:'OTHER'})});
             ME.item = 'NOTHING'; updateUI();
         }
     }
 
-    function checkHit(range) {
-        const dx = (ME.x + ME.w/2) - (OTHER.x + OTHER.w/2);
-        const dy = (ME.y + ME.h/2) - (OTHER.y + OTHER.h/2);
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        const angleToEnemy = Math.atan2(dy, dx);
-        const angleDiff = Math.abs(myAngle - angleToEnemy);
-        return (dist < range && Math.abs(angleDiff) < 1.0);
-    }
-    
     function checkRectOverlap(x, y, w, h, target) {
         return (x < target.x + target.w && x + w > target.x && y < target.y + target.h && y + h > target.y);
     }
@@ -509,22 +564,17 @@
             i++;
             if(i>10) {
                 clearInterval(t);
-                
-                // RARITY LOGIC
                 const r = Math.random() * 1000;
                 let newItem = 'NOTHING';
-                
-                if (r <= 1) newItem = 'LASER';        // 1/1000
-                else if (r <= 3) newItem = 'TELEPORTER'; // 2/1000 (1/500)
-                else if (r <= 13) newItem = 'NUKE';      // 10/1000 (1/100)
+                if (r <= 1) newItem = 'LASER';
+                else if (r <= 3) newItem = 'TELEPORTER';
+                else if (r <= 13) newItem = 'NUKE';
                 else {
-                    // Common Pool
                     const c = Math.random();
                     if(c < 0.4) newItem = 'STICK';
                     else if (c < 0.7) newItem = 'SNOWBALL';
                     else newItem = 'SWORD';
                 }
-                
                 ME.item = newItem;
                 updateUI();
             }
