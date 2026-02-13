@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Platformer: Whiteout Edition</title>
+    <title>Pixel Platformer</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tiny5&display=swap" rel="stylesheet">
     
@@ -16,7 +16,7 @@
             font-family: 'Tiny5', sans-serif; 
             overflow: hidden; 
         }
-        canvas { display: block; margin: 0 auto; background: #111; border: 2px solid #fff; }
+        canvas { display: block; margin: 0 auto; background: #111; border: 2px solid #333; }
         
         /* --- WHITE NEON THEME --- */
         .neon-text {
@@ -39,7 +39,7 @@
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             transition: opacity 0.5s ease;
         }
-        .loader-box { position: relative; width: 100px; height: 100px; margin-bottom: 20px; }
+        .loader-box { position: relative; width: 100px; height: 100px; margin-bottom: 20px; margin-top: 20px; }
         .loader-box span {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             transform: rotate(calc(30deg * var(--i)));
@@ -55,11 +55,11 @@
         }
         .loader-hidden { opacity: 0; pointer-events: none; }
 
-        /* MENUS */
+        /* MENUS (TRANSPARENT) */
         .menu-screen { 
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: #000; padding: 40px; 
-            border: 4px solid #fff; box-shadow: 0 0 15px #fff;
+            background: transparent; 
+            padding: 40px; 
             text-align: center; display: none; z-index: 100; min-width: 300px;
         }
         #main-menu { display: block; }
@@ -88,18 +88,18 @@
 <body>
 
     <div id="loading-screen">
+        <h1 class="neon-text" style="font-size: 50px; letter-spacing: 5px; margin: 0;">PIXEL PLATFORMER</h1>
         <div class="loader-box">
             <span style="--i:1;"></span><span style="--i:2;"></span><span style="--i:3;"></span>
             <span style="--i:4;"></span><span style="--i:5;"></span><span style="--i:6;"></span>
             <span style="--i:7;"></span><span style="--i:8;"></span><span style="--i:9;"></span>
             <span style="--i:10;"></span><span style="--i:11;"></span><span style="--i:12;"></span>
         </div>
-        <p class="neon-text" style="font-size: 20px; letter-spacing: 2px;">LOADING RESOURCES...</p>
+        <p style="color: #888; letter-spacing: 2px;">LOADING...</p>
     </div>
 
     <div id="main-menu" class="menu-screen">
-        <h1 class="neon-text" style="font-size: 50px; margin: 0;">WHITEOUT FIGHT</h1>
-        <p style="color: #aaa; margin-bottom: 30px;">KNOCKOUT ARENA</p>
+        <h1 class="neon-text" style="font-size: 60px; margin: 0; margin-bottom: 20px;">PIXEL PLATFORMER</h1>
         <button class="btn" onclick="startSingle()">Single Player</button>
         <button class="btn" onclick="showMenu('multi-menu')">Multiplayer</button>
     </div>
@@ -143,18 +143,16 @@
     <canvas id="gameCanvas" width="1000" height="600"></canvas>
 
 <script>
-    // --- CUSTOM ASSETS (PUT YOUR IMAGE LINKS HERE) ---
-    // Leave src as '' to use the default colors.
+    // --- CUSTOM ASSETS ---
     const ASSETS = {
-        player: { src: '', color: '#fff' },     // Your Character
-        enemy:  { src: '', color: '#ff4444' },  // Enemy Character (Red)
+        player: { src: '', color: '#fff' },
+        enemy:  { src: '', color: '#ff4444' },
         sword:  { src: '' },
         snowball: { src: '' },
         nuke:   { src: '' },
         laser:  { src: '' }
     };
 
-    // Helper to load images
     const sprites = {};
     for (const key in ASSETS) {
         if (ASSETS[key].src) {
@@ -164,24 +162,23 @@
         }
     }
 
-    // --- LOAD HANDLER ---
     window.addEventListener('load', () => {
         setTimeout(() => {
             const l = document.getElementById('loading-screen');
             l.style.opacity = '0';
             setTimeout(() => l.remove(), 500);
-        }, 1000);
+        }, 2000); 
     });
 
-    // --- PHYSICS CONFIG (Adjusted for "Snappy" feel) ---
+    // --- PHYSICS CONFIG (SLOWED DOWN) ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    const GRAVITY = 0.9;      // Heavy gravity for less float
-    const JUMP_FORCE = -18;   // Strong jump
-    const SPEED = 5;
+    const GRAVITY = 0.9;      
+    const JUMP_FORCE = -18;   
+    const SPEED = 2.5;        // CHANGED: Was 5 (Much slower now)
     const GROUND = 500;
-    const ROLL_COOLDOWN = 1500; // 1.5 seconds
+    const ROLL_COOLDOWN = 1500; 
 
     // --- GAME STATE ---
     let myId = null;
@@ -189,7 +186,7 @@
     let conn = null;
     let isHost = false;
     let isGameRunning = false;
-    let projectiles = []; // For snowballs
+    let projectiles = []; 
     let scores = { me: 0, enemy: 0 };
     let canRoll = true;
 
@@ -206,49 +203,34 @@
 
     // --- ITEM RARITY LOGIC ---
     function getRandomItem() {
-        const r = Math.random() * 1000; // 0 to 1000
+        const r = Math.random() * 1000; 
         
-        // 1. Ultra Rare (Laser) - 1/1000
         if (r <= 1) return 'LASER';
-        
-        // 2. Legendary (Teleporter) - 1/500 (approx)
-        if (r <= 3) return 'TELEPORTER'; // 2, 3
-        
-        // 3. Epic (Nuke) - 1/100 (approx)
+        if (r <= 3) return 'TELEPORTER'; 
         if (r <= 13) return 'NUKE'; 
         
-        // 4. Common Pool (remaining ~987)
-        // Re-roll for standard items to keep percentages clean
         const standard = Math.random();
-        
-        if (standard < 0.50) return 'NOTHING';        // 50%
-        if (standard < 0.70) return 'STICK';          // 20%
-        if (standard < 0.90) return 'SNOWBALL';       // 20%
-        return 'SWORD';                               // 10%
+        if (standard < 0.50) return 'NOTHING';        
+        if (standard < 0.70) return 'STICK';          
+        if (standard < 0.90) return 'SNOWBALL';       
+        return 'SWORD';                               
     }
 
     // --- ITEM USAGE LOGIC ---
     function useItem() {
         if (ME.frozen) return;
 
-        // SWORD
         if (ME.item === 'SWORD') {
-            // Simple hitbox check
             if (checkHit(ME, OTHER, 80)) {
-                sendHit('KNOCKBACK', 20); // Big physical hit
+                sendHit('KNOCKBACK', 20); 
             }
         }
-
-        // STICK
         if (ME.item === 'STICK') {
             if (checkHit(ME, OTHER, 60)) {
-                sendHit('KNOCKBACK', 15); // 1.5x knockback
+                sendHit('KNOCKBACK', 15); 
             }
         }
-
-        // SNOWBALL
         if (ME.item === 'SNOWBALL') {
-            // Spawn projectile
             projectiles.push({
                 x: ME.x + 20, y: ME.y + 10,
                 vx: ME.facingRight ? 12 : -12,
@@ -256,44 +238,34 @@
                 owner: 'ME',
                 type: 'snowball'
             });
-            ME.item = 'Nothing'; // Consumed
+            ME.item = 'Nothing'; 
             updateItemDisplay();
             
-            // Send projectile spawn to other player (visual sync)
             if (conn) conn.send({ type: 'SPAWN_PROJ', x: ME.x, y: ME.y, dir: ME.facingRight ? 1 : -1 });
         }
-
-        // NUKE
         if (ME.item === 'NUKE') {
             sendHit('NUKE', 100);
             ME.item = 'Nothing';
             updateItemDisplay();
         }
-
-        // TELEPORTER
         if (ME.item === 'TELEPORTER') {
             sendHit('TELEPORT', 0);
             ME.item = 'Nothing';
             updateItemDisplay();
         }
-
-        // LASER
         if (ME.item === 'LASER') {
-            // Infinite range hit
-            // Check if facing correct direction
             let hit = false;
             if (ME.facingRight && OTHER.x > ME.x) hit = true;
             if (!ME.facingRight && OTHER.x < ME.x) hit = true;
             
             if (hit) {
-                // Visual Laser
                 ctx.strokeStyle = '#fff';
                 ctx.lineWidth = 5;
                 ctx.beginPath();
                 ctx.moveTo(ME.x + 20, ME.y + 20);
                 ctx.lineTo(ME.facingRight ? 1000 : 0, ME.y + 20);
                 ctx.stroke();
-                sendHit('KNOCKBACK', 50); // Massive hit
+                sendHit('KNOCKBACK', 50); 
             }
             ME.item = 'Nothing';
             updateItemDisplay();
@@ -310,43 +282,38 @@
         if (conn) {
             conn.send({ type: 'HIT', effect: effectType, force: force, dir: ME.facingRight ? 1 : -1 });
         } else {
-            // Single player testing
             applyHitTo(OTHER, effectType, force, ME.facingRight ? 1 : -1);
         }
     }
 
-    // --- RECEIVE HIT LOGIC (Runs when YOU get hit) ---
     function applyHitTo(target, effect, force, dir) {
         if (effect === 'KNOCKBACK') {
             target.vx = dir * force;
-            target.vy = -5; // Small pop up
+            target.vy = -5; 
         }
         if (effect === 'FREEZE') {
             target.vx = dir * force;
             target.frozen = true;
-            target.color = '#00ffff'; // Turn blue
+            target.color = '#00ffff'; 
             setTimeout(() => {
                 target.frozen = false;
-                target.color = isHost ? '#ff4444' : '#fff'; // Revert color
-            }, 500); // 0.5s freeze
+                target.color = isHost ? '#ff4444' : '#fff'; 
+            }, 500); 
         }
         if (effect === 'NUKE') {
-            target.vx = 50; // Fly away
+            target.vx = 50; 
             target.vy = -50;
         }
         if (effect === 'TELEPORT') {
-            target.x = -100; // Teleport off map
+            target.x = -100; 
             target.y = -100;
         }
     }
 
-    // --- UI HELPERS ---
     function updateItemDisplay() {
         document.getElementById('item-display').innerText = ME.item;
-        
-        // Color coding rarities
         const disp = document.getElementById('item-display');
-        if (['NUKE','TELEPORTER','LASER'].includes(ME.item)) disp.style.color = '#ff00ff'; // Purple for rare
+        if (['NUKE','TELEPORTER','LASER'].includes(ME.item)) disp.style.color = '#ff00ff'; 
         else if (ME.item === 'NOTHING') disp.style.color = '#555';
         else disp.style.color = '#fff';
     }
@@ -371,7 +338,6 @@
         }, 100);
     }
 
-    // --- MENUS ---
     function showMenu(id) {
         document.querySelectorAll('.menu-screen').forEach(el => el.style.display = 'none');
         document.getElementById(id).style.display = 'block';
@@ -406,25 +372,21 @@
 
     function initConnection() {
         conn.on('data', (data) => {
-            // Position Sync
             if (data.x !== undefined) {
                 OTHER.x = data.x; OTHER.y = data.y; 
                 OTHER.item = data.item;
                 OTHER.facingRight = data.facingRight;
             }
-            // Hit Event
             if (data.type === 'HIT') {
                 applyHitTo(ME, data.effect, data.force, data.dir);
             }
-            // Projectile Spawn
             if (data.type === 'SPAWN_PROJ') {
                 projectiles.push({
                     x: data.x, y: data.y, vx: data.dir * 12, vy: -2, owner: 'OTHER', type: 'snowball'
                 });
             }
-            // Score Sync
             if (data.type === 'DEATH') {
-                scores.me++; // If they died, I get a point
+                scores.me++; 
                 updateScore();
             }
         });
@@ -447,11 +409,10 @@
         }
     }
 
-    // --- CONTROLS ---
     const keys = {};
     window.addEventListener('keydown', e => {
         keys[e.key.toLowerCase()] = true;
-        if (e.key === ' ' && ME.item !== 'Nothing') useItem(); // Space to use Item
+        if (e.key === ' ' && ME.item !== 'Nothing') useItem(); 
         if (e.key === 'e') spinRNG();
         if (e.key.toLowerCase() === 'shift') tryRoll();
     });
@@ -460,14 +421,13 @@
     function tryRoll() {
         if (canRoll && !ME.frozen) {
             ME.rolling = true;
-            ME.vx = ME.facingRight ? 15 : -15; // Speed boost
+            ME.vx = ME.facingRight ? 8 : -8; // CHANGED: Was 15 (Slower roll)
             canRoll = false;
             
-            // Cooldown UI
             const msg = document.getElementById('cooldown-msg');
             msg.style.opacity = 1;
 
-            setTimeout(() => ME.rolling = false, 300); // 0.3s duration
+            setTimeout(() => ME.rolling = false, 300); 
             setTimeout(() => {
                 canRoll = true;
                 msg.style.opacity = 0;
@@ -475,58 +435,48 @@
         }
     }
 
-    // --- GAME LOOP ---
     function update() {
-        if (ME.frozen) return; // Can't move if frozen
+        if (ME.frozen) return; 
 
-        // MOVEMENT
         let speed = SPEED;
-        if (ME.item === 'STICK') speed = SPEED * 0.9; // Holding heavy stick?
+        if (ME.item === 'STICK') speed = SPEED * 0.9; 
         
         if (keys['a']) { ME.vx = -speed; ME.facingRight = false; }
         else if (keys['d']) { ME.vx = speed; ME.facingRight = true; }
-        else if (!ME.rolling) { ME.vx *= 0.8; } // Friction
+        else if (!ME.rolling) { ME.vx *= 0.8; } 
 
-        // JUMP (No bouncing - crisp landing)
         if (keys['w'] && ME.y + ME.h >= GROUND) {
             ME.vy = JUMP_FORCE;
         }
 
-        // PHYSICS
         ME.vy += GRAVITY;
         ME.x += ME.vx;
         ME.y += ME.vy;
 
-        // GROUND COLLISION (Crisp stop)
         if (ME.y + ME.h > GROUND) {
             ME.y = GROUND - ME.h;
-            ME.vy = 0; // Set strictly to 0 to prevent bounce
+            ME.vy = 0; 
         }
 
-        // BOUNDARIES & DEATH
         if (ME.x < -100 || ME.x > canvas.width + 100 || ME.y < -100) {
-            // Respawn
             ME.x = 400; ME.y = 0; ME.vx = 0; ME.vy = 0;
             ME.frozen = false;
-            scores.enemy++; // Other player gets point
+            scores.enemy++; 
             updateScore();
             if (conn) conn.send({ type: 'DEATH' });
         }
 
-        // PROJECTILES
         for (let i = projectiles.length - 1; i >= 0; i--) {
             let p = projectiles[i];
             p.x += p.vx;
             p.y += p.vy;
-            p.vy += 0.2; // Gravity for snowball
+            p.vy += 0.2; 
 
-            // Hit detection (Snowball vs Player)
             let target = (p.owner === 'ME') ? OTHER : ME;
             
             if (target.x < p.x + 10 && target.x + target.w > p.x &&
                 target.y < p.y + 10 && target.y + target.h > p.y) {
                 
-                // If *I* got hit by *OTHER'S* snowball
                 if (p.owner === 'OTHER') {
                     applyHitTo(ME, 'FREEZE', 10, (p.vx > 0 ? 1 : -1));
                 }
@@ -534,7 +484,6 @@
                 continue;
             }
 
-            // Remove if off screen or hits ground
             if (p.y > GROUND || p.x < 0 || p.x > 1000) {
                 projectiles.splice(i, 1);
             }
@@ -542,18 +491,15 @@
     }
 
     function draw() {
-        // Background
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Floor
         ctx.fillStyle = '#000';
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 2;
         ctx.fillRect(0, GROUND, canvas.width, 100);
         ctx.beginPath(); ctx.moveTo(0, GROUND); ctx.lineTo(1000, GROUND); ctx.stroke();
 
-        // Projectiles
         ctx.fillStyle = '#fff';
         projectiles.forEach(p => {
             if (sprites.snowball) {
@@ -563,10 +509,7 @@
             }
         });
 
-        // Draw Player (ME)
         drawPlayer(ME, ASSETS.player.color, sprites.player);
-
-        // Draw Player (OTHER)
         drawPlayer(OTHER, ASSETS.enemy.color, sprites.enemy);
     }
 
@@ -578,14 +521,12 @@
             ctx.fillRect(p.x, p.y, p.w, p.h);
         }
         
-        // Draw Item Held
         if (p.item !== 'NOTHING') {
             ctx.fillStyle = '#fff';
             ctx.font = '10px Arial';
             ctx.fillText(p.item, p.x, p.y - 10);
         }
         
-        // Frozen status
         if (p.frozen) {
             ctx.strokeStyle = '#00ffff';
             ctx.strokeRect(p.x-5, p.y-5, p.w+10, p.h+10);
