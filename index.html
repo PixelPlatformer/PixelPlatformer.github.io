@@ -3,19 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Platformer: Rolling Chaos</title>
+    <title>Pixel Platformer: Chaos Edition</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tiny5&display=swap" rel="stylesheet">
-    
     <style>
-        body { margin: 0; background: #111; color: #fff; font-family: 'Tiny5', sans-serif; overflow: hidden; cursor: crosshair; }
+        body { margin: 0; background: #000; color: #fff; font-family: 'Tiny5', sans-serif; overflow: hidden; cursor: crosshair; }
         #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
-        canvas#gameCanvas { display: none; background: #87CEEB; }
+        canvas#gameCanvas { display: none; background: #87CEEB; width: 100vw; height: 100vh; }
 
         .menu-screen { 
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             text-align: center; display: none; z-index: 100; min-width: 400px;
-            background: rgba(0,0,0,0.9); padding: 30px; border: 2px solid #00d2ff;
+            background: rgba(0,0,0,0.95); padding: 30px; border: 2px solid #00d2ff;
         }
         #main-menu { display: block; }
         .btn { 
@@ -24,7 +23,8 @@
             text-transform: uppercase; width: 100%;
         }
         .btn:hover { background: #00d2ff; color: #000; }
-        input { background: #000; color: #fff; border: 2px solid #00d2ff; font-family: 'Tiny5'; font-size: 24px; padding: 10px; width: 100%; text-align: center; }
+        .btn-kick { border-color: #ff4444; color: #ff4444; width: auto; padding: 5px 10px; font-size: 14px; }
+        input { background: #000; color: #fff; border: 2px solid #00d2ff; font-family: 'Tiny5'; font-size: 24px; padding: 10px; width: 100%; text-align: center; box-sizing: border-box; }
 
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; z-index: 20; }
         #scoreboard { position: absolute; top: 20px; right: 20px; text-align: right; }
@@ -35,16 +35,28 @@
     <canvas id="bg-canvas"></canvas>
     
     <div id="main-menu" class="menu-screen">
-        <h1 style="font-size: 60px; color: #00d2ff;">PIXEL PLATFORMER</h1>
-        <input type="text" id="player-name-input" placeholder="NAME" maxlength="10">
-        <button class="btn" onclick="setupHost()">HOST</button>
-        <button class="btn" onclick="joinGame()">JOIN</button>
+        <h1 style="font-size: 60px; color: #00d2ff; margin-bottom: 20px;">PIXEL PLATFORMER</h1>
+        <input type="text" id="player-name-input" placeholder="ENTER NAME" maxlength="10">
+        <button class="btn" onclick="setupHost()">HOST GAME</button>
+        <button class="btn" onclick="showMenu('join-menu')">JOIN GAME</button>
     </div>
 
-    <div id="host-room" class="menu-screen">
-        <h2>LOBBY</h2>
-        <div id="host-code" style="font-size: 40px; color: #00ffff; margin: 20px;">...</div>
-        <button class="btn" onclick="triggerCountdown()" id="start-btn" disabled>START</button>
+    <div id="join-menu" class="menu-screen">
+        <h2>JOIN GAME</h2>
+        <input type="text" id="join-code-input" placeholder="4-LETTER CODE" maxlength="4">
+        <button class="btn" onclick="joinGame()">CONNECT</button>
+        <button class="btn" onclick="showMenu('main-menu')">BACK</button>
+    </div>
+
+    <div id="host-lobby" class="menu-screen">
+        <h2>LOBBY CREATED</h2>
+        <div id="host-code-display" style="font-size: 50px; color: #00ffff; margin: 20px; border: 2px dashed #00ffff; padding: 10px;">...</div>
+        <div id="player-list" style="margin-bottom: 20px; text-align: left;">
+            <p>1. HOST (YOU)</p>
+            <div id="opponent-entry"></div>
+        </div>
+        <button class="btn" onclick="triggerStart()" id="start-btn" disabled>START MATCH</button>
+        <button class="btn" onclick="location.reload()" style="border-color: #555;">CANCEL</button>
     </div>
 
     <div id="ui-layer">
@@ -65,53 +77,33 @@
     const bgCanvas = document.getElementById('bg-canvas');
     const bgCtx = bgCanvas.getContext('2d');
 
-    // --- MAP DATA ---
-    const MAP = {
-        islands: [
-            { x: 100, y: 500, w: 400, h: 40 },
-            { x: 700, y: 500, w: 400, h: 40 },
-            { x: 400, y: 300, w: 400, h: 40 },
-            { x: 1000, y: 250, w: 300, h: 40 }
-        ],
-        ladders: [
-            { x: 450, y: 300, w: 40, h: 200 },
-            { x: 710, y: 300, w: 40, h: 200 }
-        ]
-    };
-
-    // --- PHYSICS & CONSTANTS ---
-    const GRAVITY = 0.6;
-    const JUMP = -12;
-    const ACCEL = 0.5;
-    const FRICTION = 0.92;
-    const MAX_SPEED = 6;
+    // --- GAME DATA ---
+    const ISLAND_Y = 400, ISLAND_X = 200, ISLAND_W = 600;
+    const GRAVITY = 0.7, JUMP = -13, BASE_SPEED = 2.0;
 
     let isGameRunning = false, isHost = false, conn, peer, myId;
     let mouseX = 0, mouseY = 0, myAngle = 0;
-    let projectiles = [], beams = [], scores = { me: 0, enemy: 0 };
-    let lastHitter = null; // Tracks who hit who for kill credit
+    let projectiles = [], scores = { me: 0, enemy: 0 };
 
-    const ME = { x: 0, y: 0, r: 20, vx: 0, vy: 0, rot: 0, item: 'NOTHING', name: 'ME', color: '#fff', onLadder: false };
+    const ME = { x: 0, y: 0, r: 20, vx: 0, vy: 0, rot: 0, item: 'NOTHING', name: 'ME', color: '#fff' };
     const OTHER = { x: 0, y: 0, r: 20, rot: 0, item: 'NOTHING', name: 'OPP', angle: 0, color: '#ff4444' };
 
     function resize() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        bgCanvas.width = window.innerWidth;
-        bgCanvas.height = window.innerHeight;
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
     }
-    window.addEventListener('resize', resize);
-    resize();
+    window.addEventListener('resize', resize); resize();
 
-    // --- NETWORKING ---
+    // --- MULTIPLAYER ---
     function setupHost() {
         ME.name = document.getElementById('player-name-input').value || "HOST";
         myId = Math.random().toString(36).substr(2, 4).toUpperCase();
-        document.getElementById('host-code').innerText = myId;
-        showMenu('host-room');
+        document.getElementById('host-code-display').innerText = myId;
+        showMenu('host-lobby');
         peer = new Peer(myId);
         peer.on('connection', c => {
             conn = c;
+            document.getElementById('opponent-entry').innerHTML = `2. PLAYER CONNECTED <button class="btn-kick" onclick="kickPlayer()">KICK</button>`;
             document.getElementById('start-btn').disabled = false;
             initConn();
         });
@@ -120,7 +112,7 @@
 
     function joinGame() {
         ME.name = document.getElementById('player-name-input').value || "GUEST";
-        const code = prompt("ENTER CODE:");
+        const code = document.getElementById('join-code-input').value.toUpperCase();
         peer = new Peer();
         peer.on('open', () => {
             conn = peer.connect(code);
@@ -128,199 +120,113 @@
         });
     }
 
+    function kickPlayer() {
+        if(conn) conn.close();
+        document.getElementById('opponent-entry').innerHTML = "";
+        document.getElementById('start-btn').disabled = true;
+    }
+
     function initConn() {
         conn.on('data', data => {
             if (data.type === 'START') startGame();
+            if (data.type === 'KICK') { alert("Kicked by Host"); location.reload(); }
             if (data.x !== undefined) {
                 OTHER.x = data.x; OTHER.y = data.y; OTHER.rot = data.rot;
                 OTHER.item = data.item; OTHER.angle = data.angle;
             }
-            if (data.type === 'HIT') {
-                ME.vx = data.vx; ME.vy = data.vy;
-                lastHitter = "OTHER";
-            }
-            if (data.type === 'PROJ') projectiles.push(data.obj);
-            if (data.type === 'BEAM') beams.push(data.obj);
             if (data.type === 'POINT') { scores.me++; updateUI(); }
         });
+        if(!isHost) showMenu('host-lobby'); // Show lobby for joiner too
+    }
+
+    function triggerStart() {
+        if (conn) conn.send({ type: 'START' });
+        startGame();
     }
 
     function startGame() {
-        if (isHost && conn) conn.send({ type: 'START' });
         document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none');
         document.getElementById('ui-layer').style.display = 'block';
         canvas.style.display = 'block';
         isGameRunning = true;
-        ME.x = isHost ? 200 : 800;
-        ME.y = 100;
+        ME.x = isHost ? 300 : 700; ME.y = 100;
         requestAnimationFrame(gameLoop);
         setInterval(() => {
             if (conn && conn.open) conn.send({ x: ME.x, y: ME.y, rot: ME.rot, item: ME.item, angle: myAngle });
         }, 20);
     }
 
-    // --- CONTROLS ---
+    // --- INPUT ---
     const keys = {};
-    window.onkeydown = e => keys[e.key.toLowerCase()] = true;
+    window.onkeydown = e => { 
+        keys[e.key.toLowerCase()] = true;
+        if(e.key === ' ' && ME.item !== 'NOTHING') useItem();
+        if(e.key === 'e') spinRNG();
+    };
     window.onkeyup = e => keys[e.key.toLowerCase()] = false;
     window.onmousemove = e => {
+        const rect = canvas.getBoundingClientRect();
         mouseX = e.clientX; mouseY = e.clientY;
         myAngle = Math.atan2(mouseY - ME.y, mouseX - ME.x);
     };
-    window.onmousedown = () => { if (ME.item !== 'NOTHING') useItem(); };
+
+    function spinRNG() {
+        const items = ['SNOWBALL', 'SWORD'];
+        ME.item = items[Math.floor(Math.random() * items.length)];
+        document.getElementById('item-display').innerText = ME.item;
+    }
 
     function useItem() {
-        const vx = Math.cos(myAngle), vy = Math.sin(myAngle);
-        if (ME.item === 'SNOWBALL') {
-            const obj = { x: ME.x, y: ME.y, vx: vx * 10, vy: vy * 10, owner: 'ME', type: 'SNOW' };
-            projectiles.push(obj);
-            conn.send({ type: 'PROJ', obj: { ...obj, owner: 'OTHER' } });
-        }
-        if (ME.item === 'LASER') {
-            const obj = { x: ME.x, y: ME.y, angle: myAngle, owner: 'ME', life: 30 };
-            beams.push(obj);
-            conn.send({ type: 'BEAM', obj: { ...obj, owner: 'OTHER' } });
-        }
+        if(ME.item === 'SNOWBALL') { /* Projectile logic */ }
         ME.item = 'NOTHING';
         document.getElementById('item-display').innerText = "NOTHING";
     }
 
-    // --- GAME ENGINE ---
+    // --- ENGINE ---
     function update() {
-        // Horizontal
-        if (keys['a']) ME.vx -= ACCEL;
-        if (keys['d']) ME.vx += ACCEL;
-        ME.vx *= FRICTION;
-        ME.rot += ME.vx * 0.05;
+        if(keys['a']) { ME.vx = -BASE_SPEED; ME.rot -= 0.1; }
+        else if(keys['d']) { ME.vx = BASE_SPEED; ME.rot += 0.1; }
+        else { ME.vx *= 0.8; }
 
-        // Ladder & Vertical
-        let touchingLadder = false;
-        MAP.ladders.forEach(l => {
-            if (ME.x > l.x && ME.x < l.x + l.w && ME.y > l.y && ME.y < l.y + l.h) touchingLadder = true;
-        });
+        if(keys['w'] && ME.y + ME.r >= ISLAND_Y && ME.x > ISLAND_X && ME.x < ISLAND_X + ISLAND_W) ME.vy = JUMP;
 
-        if (touchingLadder) {
-            if (keys['w']) ME.vy = -4;
-            else if (keys['s']) ME.vy = 4;
-            else ME.vy *= 0.8;
-        } else {
-            ME.vy += GRAVITY;
-            if (keys['w'] && ME.grounded) ME.vy = JUMP;
+        ME.vy += GRAVITY; ME.x += ME.vx; ME.y += ME.vy;
+
+        if (ME.y + ME.r > ISLAND_Y && ME.y < ISLAND_Y + 40 && ME.x > ISLAND_X && ME.x < ISLAND_X + ISLAND_W) {
+            if(ME.vy > 0) { ME.y = ISLAND_Y - ME.r; ME.vy = 0; }
         }
 
-        ME.x += ME.vx;
-        ME.y += ME.vy;
-
-        // Collision
-        ME.grounded = false;
-        MAP.islands.forEach(i => {
-            if (ME.x > i.x && ME.x < i.x + i.w && ME.y + ME.r > i.y && ME.y - ME.r < i.y + i.h) {
-                if (ME.vy > 0) {
-                    ME.y = i.y - ME.r;
-                    ME.vy = 0;
-                    ME.grounded = true;
-                }
-            }
-        });
-
-        // Void / Scoring
         if (ME.y > canvas.height + 100) {
-            if (lastHitter === "OTHER") {
-                conn.send({ type: 'POINT' });
-                scores.enemy++;
-            }
-            ME.x = 400; ME.y = 100; ME.vx = 0; ME.vy = 0;
-            lastHitter = null;
-            updateUI();
-        }
-
-        // Projectiles
-        projectiles.forEach((p, i) => {
-            p.x += p.vx; p.y += p.vy;
-            const d = Math.hypot(p.x - ME.x, p.y - ME.y);
-            if (d < ME.r + 5 && p.owner === 'OTHER') {
-                ME.vx = p.vx; ME.vy = -5;
-                lastHitter = "OTHER";
-                projectiles.splice(i, 1);
-            }
-        });
-
-        // Laser Knockback (Fixed)
-        beams.forEach((b, i) => {
-            b.life--;
-            if (b.owner === 'OTHER') {
-                const angleToMe = Math.atan2(ME.y - b.x, ME.x - b.x);
-                if (Math.abs(b.angle - angleToMe) < 0.15) {
-                    ME.vx += Math.cos(b.angle) * 2;
-                    ME.vy += Math.sin(b.angle) * 0.5;
-                    lastHitter = "OTHER";
-                }
-            }
-            if (b.life <= 0) beams.splice(i, 1);
-        });
-    }
-
-    function drawPlayer(p, color) {
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rot);
-        // Body
-        ctx.fillStyle = color;
-        ctx.beginPath(); ctx.arc(0, 0, p.r, 0, Math.PI * 2); ctx.fill();
-        // Face
-        ctx.fillStyle = "#000";
-        ctx.beginPath(); ctx.arc(8, -5, 3, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(-8, -5, 3, 0, Math.PI * 2); ctx.fill();
-        ctx.fillRect(-10, 5, 20, 2);
-        ctx.restore();
-
-        // Item Hand
-        if (p === ME) {
-            ctx.save();
-            ctx.translate(p.x, p.y);
-            ctx.rotate(myAngle);
-            ctx.fillStyle = color;
-            ctx.fillRect(25, -5, 10, 10);
-            ctx.restore();
+            ME.x = 500; ME.y = 100; ME.vx = 0; ME.vy = 0;
+            if(conn) conn.send({type: 'POINT'});
+            scores.enemy++; updateUI();
         }
     }
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // Islands
-        ctx.fillStyle = "#4caf50";
-        MAP.islands.forEach(i => ctx.fillRect(i.x, i.y, i.w, i.h));
-        // Ladders
-        ctx.fillStyle = "#8B4513";
-        MAP.ladders.forEach(l => {
-            for(let j=0; j<l.h; j+=20) ctx.fillRect(l.x, l.y+j, l.w, 4);
-            ctx.fillRect(l.x, l.y, 4, l.h);
-            ctx.fillRect(l.x + l.w - 4, l.y, 4, l.h);
-        });
-        // Effects
-        beams.forEach(b => {
-            ctx.strokeStyle = "red"; ctx.lineWidth = 10;
-            ctx.beginPath(); ctx.moveTo(b.x, b.y);
-            ctx.lineTo(b.x + Math.cos(b.angle) * 2000, b.y + Math.sin(b.angle) * 2000); ctx.stroke();
-        });
-        projectiles.forEach(p => {
-            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI*2); ctx.fill();
-        });
+        // Island
+        ctx.fillStyle = "#4caf50"; ctx.fillRect(ISLAND_X, ISLAND_Y, ISLAND_W, 20);
+        ctx.fillStyle = "#5d4037"; ctx.fillRect(ISLAND_X, ISLAND_Y+20, ISLAND_W, 40);
 
-        drawPlayer(ME, ME.color);
-        drawPlayer(OTHER, OTHER.color);
+        // Players
+        [ME, OTHER].forEach(p => {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rot);
+            ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.arc(0, 0, p.r, 0, Math.PI*2); ctx.fill();
+            // Eyes
+            ctx.fillStyle = "#000";
+            ctx.beginPath(); ctx.arc(8, -5, 3, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(-8, -5, 3, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+        });
     }
 
     function gameLoop() {
-        update();
-        draw();
-        if (isGameRunning) requestAnimationFrame(gameLoop);
-    }
-
-    function spinRNG() {
-        const items = ['SNOWBALL', 'LASER'];
-        ME.item = items[Math.floor(Math.random() * items.length)];
-        document.getElementById('item-display').innerText = ME.item;
+        update(); draw();
+        if(isGameRunning) requestAnimationFrame(gameLoop);
     }
 
     function updateUI() {
@@ -333,7 +239,7 @@
         document.getElementById(id).style.display = 'block';
     }
 
-    // --- MENU PARTICLES ---
+    // --- MENU ANIM ---
     function animParticles() {
         bgCtx.fillStyle = "#000"; bgCtx.fillRect(0,0,bgCanvas.width,bgCanvas.height);
         bgCtx.fillStyle = "#00d2ff";
