@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arena Royale: v1.7.0</title>
+    <title>Arena Royale: Bridge v1.8.0</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tiny5&display=swap" rel="stylesheet">
     <style>
@@ -42,7 +42,7 @@
     </style>
 </head>
 <body>
-    <div id="version-tag">v1.7.0 (Winner Update)</div>
+    <div id="version-tag">v1.8.0 (Bridge Build)</div>
 
     <canvas id="bg-canvas"></canvas>
     
@@ -68,7 +68,7 @@
     </div>
 
     <div id="victory-screen">
-        <h1 class="neon-glow" style="font-size: 80px;">WINNER!</h1>
+        <h1 class="neon-glow" style="font-size: 80px;">ROUND END</h1>
         <h2 id="winner-name" style="font-size: 50px; color: #00ffcc;">PLAYER NAME</h2>
     </div>
 
@@ -91,20 +91,23 @@
     const bgCanvas = document.getElementById('bg-canvas');
     const bgCtx = bgCanvas.getContext('2d');
 
-    // --- SECTIONED MAP DATA ---
+    // --- MODULAR BRIDGE MAP ---
     let PLATFORMS = [];
     function buildMap() {
         PLATFORMS = [];
-        // Create 12 sections in a 4x3 grid
-        for(let i=0; i<4; i++) {
-            for(let j=0; j<3; j++) {
-                PLATFORMS.push({
-                    x: (i * 350) - 400,
-                    y: (j * 150) + 200,
-                    w: 280, h: 60,
-                    contactTime: 0, falling: false, vy: 0
-                });
-            }
+        const segmentWidth = 150;
+        const totalSegments = 20;
+        const startX = -1000;
+        for(let i=0; i<totalSegments; i++) {
+            PLATFORMS.push({
+                x: startX + (i * segmentWidth),
+                y: 450,
+                w: segmentWidth - 5, // Tiny gap for visual separation
+                h: 60,
+                contactTime: 0,
+                falling: false,
+                vy: 0
+            });
         }
     }
 
@@ -124,7 +127,7 @@
     window.addEventListener('resize', resize); resize();
     function randColor() { return `hsl(${Math.random() * 360}, 75%, 65%)`; }
 
-    // --- MULTIPLAYER ---
+    // --- NETWORK ---
     function setupHost() {
         ME.name = document.getElementById('player-name-input').value || "HOST";
         myId = Math.random().toString(36).substr(2, 4).toUpperCase();
@@ -180,7 +183,7 @@
     function syncRound(num) {
         currentRound = num; isDead = false; oppDead = false; deadTime = 0; oppDeadTime = 0;
         buildMap();
-        ME.x = isHost ? -100 : 800; ME.y = 0; ME.vx = 0; ME.vy = 0;
+        ME.x = isHost ? 200 : 800; ME.y = 0; ME.vx = 0; ME.vy = 0;
         document.getElementById('victory-screen').style.display = 'none';
         updateUI();
     }
@@ -200,7 +203,6 @@
     window.onkeyup = e => keys[e.key.toLowerCase()] = false;
     window.onmousemove = e => { 
         mouseX = e.clientX; mouseY = e.clientY; 
-        // Smooth angle calculation (Fixed hand jitter)
         myAngle = Math.atan2(mouseY - ME.y, mouseX - ME.x); 
     };
 
@@ -264,7 +266,7 @@
                 ME.y = p.y - ME.r; ME.vy = 0; ME.grounded = true;
                 if(!p.falling) { 
                     p.contactTime++; 
-                    if(p.contactTime > 300) p.falling = true; // 5 Seconds (60fps * 5)
+                    if(p.contactTime > 300) p.falling = true; // 5 Seconds
                     if(isHost && p.contactTime % 10 === 0) conn.send({type:'PLAT_STATE', idx, time: p.contactTime, fall: p.falling, vy: p.vy, py: p.y});
                 }
             }
@@ -287,8 +289,8 @@
         if (!isHost) return;
         if (isDead && oppDead) {
             const diff = Math.abs(deadTime - oppDeadTime);
-            if (diff < 200) { // 0.2 second Redo logic
-                showWinner("DRAW! REPLAYING...");
+            if (diff < 200) { 
+                showWinner("DRAW! REDO!");
                 setTimeout(() => { syncRound(currentRound); if(conn) conn.send({type:'SYNC_ROUND', round:currentRound}); }, 2000);
                 return;
             }
@@ -318,14 +320,13 @@
         ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(7,-6,3,0,6.3); ctx.fill(); ctx.beginPath(); ctx.arc(-7,-6,3,0,6.3); ctx.fill();
         ctx.restore();
         
-        // HAND STABILIZATION (Smooth math)
         ctx.save(); 
         ctx.translate(p.x, p.y);
         ctx.rotate(isMe ? myAngle : p.angle);
         const s = p.swing ? Math.sin(p.swing * 0.4) * 60 : 0; 
         ctx.rotate(s * Math.PI / 180);
         ctx.fillStyle = color; ctx.strokeStyle="#000"; ctx.lineWidth=3; 
-        ctx.beginPath(); ctx.arc(42, 0, 10, 0, 6.3); ctx.fill(); ctx.stroke(); // FIST
+        ctx.beginPath(); ctx.arc(42, 0, 10, 0, 6.3); ctx.fill(); ctx.stroke(); 
         const itm = isMe ? (ME.item?.name) : p.item;
         if(itm === 'SWORD') { ctx.fillStyle = "#d1d1d1"; ctx.fillRect(45, -6, 75, 12); ctx.strokeRect(45, -6, 75, 12); }
         else if(itm === 'STICK') { ctx.fillStyle = "#5d4037"; ctx.fillRect(45, -5, 55, 10); ctx.strokeRect(45, -5, 55, 10); }
@@ -338,17 +339,20 @@
 
         PLATFORMS.forEach(p => {
             if(p.y > canvas.height + 100) return;
-            let shake = (p.contactTime > 200 && !p.falling) ? Math.sin(Date.now()*0.15)*4 : 0;
+            // SHAKE logic
+            let shake = (p.contactTime > 180 && !p.falling) ? Math.sin(Date.now()*0.2)*6 : 0;
             ctx.fillStyle = "#1b1b1b"; ctx.fillRect(p.x+shake, p.y+40, p.w, p.h-40); // Bedrock
             ctx.fillStyle = "#3e2723"; ctx.fillRect(p.x+shake, p.y+20, p.w, 30); // Dirt
             ctx.fillStyle = "#4caf50"; ctx.fillRect(p.x+shake, p.y, p.w, 15); // Grass
         });
 
-        for(let x=-200; x<canvas.width+200; x+=40) {
+        // MAGMA RENDERER
+        for(let x=-500; x<canvas.width+500; x+=40) {
             let flicker = Math.sin(magmaFrame*0.05 + x)*12;
             ctx.fillStyle = "#ff4500"; ctx.fillRect(x, MAGMA_Y + flicker, 42, 400);
         }
 
+        droppedItems.forEach(i => { ctx.fillStyle = "#000"; ctx.fillRect(i.x-15, i.y-15, 30, 30); ctx.fillStyle = "#888"; ctx.fillRect(i.x-12, i.y-12, 24, 24); });
         projectiles.forEach(p => { ctx.fillStyle = (p.type==='NUKE')?"#222":"#fff"; ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 6.3); ctx.fill(); });
         beams.forEach(b => { ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 15; ctx.beginPath(); ctx.moveTo(b.sx, b.sy); ctx.lineTo(b.sx + Math.cos(b.angle)*2500, b.sy + Math.sin(b.angle)*2500); ctx.stroke(); });
         explosions.forEach(e => { ctx.fillStyle = `rgba(255, 69, 0, ${1 - e.r/e.max})`; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 6.3); ctx.fill(); });
