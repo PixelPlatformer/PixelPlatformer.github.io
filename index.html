@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arena Royale: 4-Player v1.9.0</title>
+    <title>Arena Royale: v1.10.0</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tiny5&display=swap" rel="stylesheet">
     <style>
@@ -21,6 +21,9 @@
         #main-menu { display: block; }
         .btn { background: #000; color: #fff; border: 1px solid #fff; padding: 12px 20px; font-family: 'Tiny5'; font-size: 22px; cursor: pointer; margin: 10px 0; text-transform: uppercase; width: 100%; transition: 0.2s; }
         .btn:hover { background: #fff; color: #000; box-shadow: 0 0 20px #fff; }
+        .btn-kick { width: auto; font-size: 12px; padding: 2px 8px; border-color: #ff4444; color: #ff4444; margin-left: 10px; }
+        .btn-kick:hover { background: #ff4444; color: #fff; }
+        
         input { background: #000; color: #fff; border: 1px solid #fff; font-family: 'Tiny5'; font-size: 20px; padding: 10px; width: 100%; text-align: center; box-sizing: border-box; outline: none; }
 
         #victory-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 200; display: none; flex-direction: column; align-items: center; justify-content: center; }
@@ -30,12 +33,13 @@
         #match-info { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 28px; }
         #scoreboard { position: absolute; top: 20px; right: 20px; text-align: right; }
         #inv-slot { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 90px; height: 90px; background: rgba(0,0,0,0.8); border: 2px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; pointer-events: auto; }
-        #admin-panel { position: absolute; top: 80px; left: 20px; background: rgba(0,0,0,0.9); border: 1px solid red; padding: 15px; pointer-events: auto; display: none; }
+        
+        #player-list { margin: 20px 0; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 5px; text-align: left; }
+        .lobby-player { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 5px; }
     </style>
 </head>
 <body>
-    <div id="version-tag" style="position:fixed; bottom:10px; left:10px; font-size:14px; color:rgba(255,255,255,0.3);">v1.9.0</div>
-
+    <div id="version-tag" style="position:fixed; bottom:10px; left:10px; font-size:14px; color:rgba(255,255,255,0.3);">v1.10.0</div>
     <canvas id="bg-canvas"></canvas>
     
     <div id="main-menu" class="menu-screen">
@@ -54,18 +58,14 @@
 
     <div id="host-lobby" class="menu-screen">
         <h2 class="neon-glow">LOBBY ID: <span id="host-code-display" style="color: #ff4500;">...</span></h2>
-        <div id="player-list" style="margin: 25px 0; color: #fff; text-align: left;">
-            <div id="p1-slot">1. (You)</div>
-            <div id="p2-slot">2. Waiting...</div>
-            <div id="p3-slot">3. Waiting...</div>
-            <div id="p4-slot">4. Waiting...</div>
+        <div id="player-list">
+            <div id="lobby-list-items"></div>
         </div>
-        <button class="btn" onclick="triggerStart()" id="start-btn" disabled style="opacity:0.3;">ENTER ARENA</button>
+        <button class="btn" onclick="triggerStart()" id="start-btn" disabled style="opacity:0.3;">ENTER ARENA (2-4 PLAYERS)</button>
         <button class="btn" onclick="location.reload()">ABANDON</button>
     </div>
 
     <div id="warmup-overlay">3</div>
-
     <div id="victory-screen">
         <h1 class="neon-glow" style="font-size: 80px;">ROUND END</h1>
         <h2 id="winner-name" style="font-size: 50px; color: #00ffcc;">PLAYER NAME</h2>
@@ -74,10 +74,6 @@
     <div id="ui-layer">
         <div id="match-info">ROUND <span id="round-num">1</span>/5</div>
         <div id="scoreboard"></div>
-        <div id="admin-panel">
-            <button class="btn" style="font-size:14px;" onclick="toggleCheat('fly')">FLY</button>
-            <button class="btn" style="font-size:14px;" onclick="toggleCheat('luck')">MAX LUCK</button>
-        </div>
         <div id="inv-slot">EMPTY</div>
     </div>
 
@@ -89,25 +85,23 @@
     const bgCanvas = document.getElementById('bg-canvas');
     const bgCtx = bgCanvas.getContext('2d');
 
-    // --- MODULAR BRIDGE MAP ---
     let PLATFORMS = [];
     function buildMap() {
         PLATFORMS = [];
         const segmentWidth = 140;
         const totalSegments = 20;
-        const startX = -800;
         for(let i=0; i<totalSegments; i++) {
-            PLATFORMS.push({ x: startX + (i * segmentWidth), y: 500, w: segmentWidth - 10, h: 60, contactTime: 0, falling: false, vy: 0 });
+            PLATFORMS.push({ x: -800 + (i * segmentWidth), y: 500, w: segmentWidth - 10, h: 60, contactTime: 0, falling: false, vy: 0 });
         }
     }
 
     const MAGMA_Y = 800;
     const GRAVITY = 0.55, JUMP = -13, BASE_SPEED = 2.2;
 
-    let isGameRunning = false, isHost = false, connections = [], peer, myId;
+    let isGameRunning = false, isHost = false, connections = {}, peer, myId;
     let mouseX = 0, mouseY = 0, myAngle = 0, magmaFrame = 0, warmupTime = 0;
-    let projectiles = [], explosions = [], beams = [], droppedItems = [];
-    let players = {}; // Object to hold all network players
+    let projectiles = [], explosions = [], beams = [];
+    let players = {}; 
     let scores = {};
     let cheatFly = false, cheatLuck = false, rollTimer = 0, attackTimer = 0;
     let currentRound = 1, isDead = false;
@@ -118,24 +112,31 @@
     window.addEventListener('resize', resize); resize();
     function randColor() { return `hsl(${Math.random() * 360}, 75%, 65%)`; }
 
-    // --- NETWORK ---
+    // --- MULTIPLAYER ---
     function setupHost() {
-        ME.name = document.getElementById('player-name-input').value || "P1";
+        ME.name = document.getElementById('player-name-input').value || "HOST";
         ME.color = randColor();
         myId = Math.random().toString(36).substr(2, 4).toUpperCase();
         document.getElementById('host-code-display').innerText = myId;
         showMenu('host-lobby');
+        updateLobbyList();
+
         peer = new Peer(myId);
         peer.on('connection', c => {
-            if (connections.length >= 3) return c.close();
-            connections.push(c);
+            if (Object.keys(connections).length >= 3) return c.close();
             c.on('open', () => {
-                const pNum = connections.length + 1;
-                document.getElementById(`p${pNum}-slot`).innerText = `${pNum}. Connected!`;
-                document.getElementById('start-btn').disabled = false;
-                document.getElementById('start-btn').style.opacity = "1";
-                initConn(c);
+                // Handshake
+                c.send({ type: 'HANDSHAKE_REQ', hostName: ME.name });
             });
+            c.on('data', data => {
+                if (data.type === 'HANDSHAKE_RES') {
+                    connections[c.peer] = c;
+                    players[c.peer] = { name: data.name, color: data.color, x: 0, y: 0, dead: false };
+                    updateLobbyList();
+                    initConn(c);
+                }
+            });
+            c.on('close', () => { delete connections[c.peer]; delete players[c.peer]; updateLobbyList(); });
         });
         isHost = true;
     }
@@ -147,9 +148,41 @@
         peer = new Peer();
         peer.on('open', () => {
             const c = peer.connect(code);
-            connections.push(c);
-            c.on('open', () => initConn(c));
+            c.on('data', data => {
+                if (data.type === 'HANDSHAKE_REQ') {
+                    c.send({ type: 'HANDSHAKE_RES', name: ME.name, color: ME.color });
+                    isHost = false;
+                    initConn(c);
+                    showMenu('host-lobby');
+                }
+                if (data.type === 'KICK') { alert("Kicked from lobby"); location.reload(); }
+            });
         });
+    }
+
+    function kickPlayer(peerId) {
+        if (connections[peerId]) {
+            connections[peerId].send({ type: 'KICK' });
+            connections[peerId].close();
+            delete connections[peerId];
+            delete players[peerId];
+            updateLobbyList();
+        }
+    }
+
+    function updateLobbyList() {
+        const list = document.getElementById('lobby-list-items');
+        list.innerHTML = `<div class="lobby-player"><span>1. ${ME.name} (YOU)</span></div>`;
+        let i = 2;
+        for (let id in players) {
+            list.innerHTML += `<div class="lobby-player">
+                <span>${i}. ${players[id].name}</span>
+                ${isHost ? `<button class="btn btn-kick" onclick="kickPlayer('${id}')">KICK</button>` : ''}
+            </div>`;
+            i++;
+        }
+        document.getElementById('start-btn').disabled = (i < 3);
+        document.getElementById('start-btn').style.opacity = (i >= 3) ? "1" : "0.3";
     }
 
     function initConn(c) {
@@ -157,7 +190,7 @@
             if (data.type === 'START') startGame();
             if (data.type === 'SYNC_ROUND') syncRound(data.round);
             if (data.type === 'UPDATE') { players[data.id] = data.state; }
-            if (data.type === 'VOID') { if(players[data.id]) players[data.id].dead = true; checkMatchEnd(); }
+            if (data.type === 'VOID') { if(players[data.id]) players[data.id].dead = true; if(isHost) checkMatchEnd(); }
             if (data.type === 'HIT' && data.target === 'me') { ME.vx = data.vx; ME.vy = data.vy; }
             if (data.type === 'PROJ') projectiles.push(data.obj);
             if (data.type === 'EXPLODE') explosions.push({ x: data.x, y: data.y, r: 0, max: 250 });
@@ -166,7 +199,7 @@
     }
 
     function triggerStart() {
-        connections.forEach(c => c.send({ type: 'START' }));
+        for (let id in connections) connections[id].send({ type: 'START' });
         startGame();
     }
 
@@ -177,35 +210,30 @@
         isGameRunning = true; 
         syncRound(1);
         requestAnimationFrame(gameLoop);
-        setInterval(networkLoop, 30);
+        setInterval(() => {
+            const state = { x: ME.x, y: ME.y, rot: ME.rot, item: ME.item?.name || 'NOTHING', angle: myAngle, name: ME.name, color: ME.color, swing: ME.swing, dead: isDead };
+            for (let id in connections) connections[id].send({ type: 'UPDATE', id: peer.id, state });
+        }, 25);
     }
 
     function syncRound(num) {
-        currentRound = num; isDead = false; 
-        warmupTime = 180; // 3 Seconds @ 60fps
+        currentRound = num; isDead = false; warmupTime = 180;
         buildMap();
-        // Dynamic spawn positions for 4 players
-        const spawnX = [-200, 200, 600, 1000];
-        const idx = isHost ? 0 : connections.length; // Simplified
-        ME.x = spawnX[idx] || 0; ME.y = -100; ME.vx = 0; ME.vy = 0;
-        Object.keys(players).forEach(k => players[k].dead = false);
+        const spawnX = [-400, 0, 400, 800];
+        const myIndex = isHost ? 0 : Object.keys(players).indexOf(peer.id) + 1;
+        ME.x = spawnX[myIndex % 4]; ME.y = -150; ME.vx = 0; ME.vy = 0;
+        for (let id in players) players[id].dead = false;
         document.getElementById('victory-screen').style.display = 'none';
         updateUI();
     }
 
-    function networkLoop() {
-        if (!conn && connections.length === 0) return;
-        const state = { x: ME.x, y: ME.y, rot: ME.rot, item: ME.item?.name || 'NOTHING', angle: myAngle, name: ME.name, color: ME.color, swing: ME.swing, dead: isDead };
-        connections.forEach(c => c.send({ type: 'UPDATE', id: peer.id, state }));
-    }
-
-    // --- CONTROLS ---
+    // --- INPUT & ITEMS ---
     window.onkeydown = e => { 
         if(isDead || warmupTime > 0) return;
         if(e.key === ' ' && attackTimer <= 0) handleAttack();
         if(e.key === 'e') spinRNG();
         if(e.key === 'Shift' && rollTimer <= 0) roll();
-        if(e.key === '/') { const p = prompt("ADMIN KEY:"); if(p === '67412') document.getElementById('admin-panel').style.display='block'; }
+        if(e.key === '/') { const p = prompt("ADMIN KEY:"); if(p === '67412') alert("God mode toggles enabled in UI (if present)"); }
         keys[e.key.toLowerCase()] = true; 
     };
     const keys = {};
@@ -214,45 +242,42 @@
 
     function spinRNG() {
         if(ME.item) return;
-        const items = [{ name: 'STICK', ammo: Infinity }, { name: 'SWORD', ammo: Infinity }, { name: 'SNOWBALL', ammo: 8 }, { name: 'NUKE', ammo: 1 }, { name: 'LASER', ammo: 10 }];
-        let r = Math.random() * 100; if(cheatLuck) r = 0;
+        const items = [{ name: 'STICK', ammo: Infinity }, { name: 'SWORD', ammo: Infinity }, { name: 'SNOWBALL', ammo: 8 }, { name: 'NUKE', ammo: 1 }, { name: 'LASER', ammo: 5 }];
+        let r = Math.random() * 100;
         let res = items[Math.floor(Math.random() * 3)];
-        if(r < 10) res = items[3]; if(r < 3) res = items[4];
+        if(r < 10) res = items[3]; if(r < 4) res = items[4];
         ME.item = {...res}; updateUI();
     }
 
     function handleAttack() {
-        if(!ME.item) { ME.swing = 10; attackTimer = 50; checkMeleeHit(70, 8); return; }
+        if(!ME.item) { ME.swing = 10; attackTimer = 50; checkMeleeHit(75, 8); return; }
         const vx = Math.cos(myAngle), vy = Math.sin(myAngle);
-        if (ME.item.name === 'STICK') { ME.swing = 15; attackTimer = 70; checkMeleeHit(90, 20); } 
-        else if (ME.item.name === 'SWORD') { ME.swing = 20; attackTimer = 80; checkMeleeHit(150, 25); } 
+        if (ME.item.name === 'STICK') { ME.swing = 15; attackTimer = 70; checkMeleeHit(95, 20); } 
+        else if (ME.item.name === 'SWORD') { ME.swing = 20; attackTimer = 85; checkMeleeHit(155, 25); } 
         else if (ME.item.name === 'SNOWBALL') {
             const obj = { x: ME.x, y: ME.y, vx: vx * 13, vy: vy * 13, owner: peer.id, type: 'SNOW' };
-            projectiles.push(obj); connections.forEach(c => c.send({ type: 'PROJ', obj }));
-            ME.item.ammo--; attackTimer = 90;
-        } else if (ME.item.name === 'NUKE') {
-            const obj = { x: ME.x, y: ME.y, vx: vx * 6, vy: vy * 4, owner: peer.id, type: 'NUKE' };
-            projectiles.push(obj); connections.forEach(c => c.send({ type: 'PROJ', obj }));
-            ME.item.ammo--;
+            projectiles.push(obj); for(let id in connections) connections[id].send({ type: 'PROJ', obj });
+            ME.item.ammo--; attackTimer = 100;
+        } else if (ME.item.name === 'LASER') {
+             const obj = { sx: ME.x, sy: ME.y, angle: myAngle, owner: peer.id, life: 35 };
+             beams.push(obj); for(let id in connections) connections[id].send({ type: 'BEAM', obj });
+             ME.item.ammo--; attackTimer = 40;
         }
         if (ME.item && ME.item.ammo <= 0) ME.item = null;
         updateUI();
     }
 
     function checkMeleeHit(range, force) {
-        Object.keys(players).forEach(id => {
+        for (let id in players) {
             const p = players[id];
-            const d = Math.hypot(p.x - ME.x, p.y - ME.y);
-            if (d < range && !p.dead) {
-                connections.forEach(c => c.send({ type: 'HIT', target: id, vx: Math.cos(myAngle) * force, vy: -7 }));
+            if (!p.dead && Math.hypot(p.x - ME.x, p.y - ME.y) < range) {
+                connections[id].send({ type: 'HIT', target: 'me', vx: Math.cos(myAngle) * force, vy: -7 });
             }
-        });
+        }
     }
 
     function roll() { ME.vx = (mouseX > ME.x ? 1 : -1) * 18; rollTimer = 110; }
-    function toggleCheat(c) { if(c==='fly') cheatFly=!cheatFly; if(c==='luck') cheatLuck=!cheatLuck; }
 
-    // --- GAME ENGINE ---
     function update() {
         if (!isGameRunning) return;
         magmaFrame++;
@@ -268,7 +293,7 @@
         if(!isDead) {
             attackTimer--; rollTimer--; ME.swing--;
             if (keys['a']) { ME.vx = -BASE_SPEED; ME.rot -= 0.1; } else if (keys['d']) { ME.vx = BASE_SPEED; ME.rot += 0.1; } else { ME.vx *= 0.88; }
-            if(!cheatFly) { if(keys['w'] && ME.grounded) ME.vy = JUMP; ME.vy += GRAVITY; } else { if(keys['w']) ME.vy = -5; else if(keys['s']) ME.vy = 5; else ME.vy = 0; }
+            if(keys['w'] && ME.grounded) ME.vy = JUMP; ME.vy += GRAVITY;
             ME.x += ME.vx; ME.y += ME.vy;
             ME.grounded = false;
 
@@ -279,54 +304,45 @@
                     if(!p.falling) { 
                         p.contactTime++; 
                         if(p.contactTime > 300) p.falling = true;
-                        if(isHost && p.contactTime % 15 === 0) connections.forEach(c => c.send({type:'PLAT_STATE', idx, time: p.contactTime, fall: p.falling, vy: p.vy, py: p.y}));
+                        if(isHost && p.contactTime % 15 === 0) for(let id in connections) connections[id].send({type:'PLAT_STATE', idx, time: p.contactTime, fall: p.falling, vy: p.vy, py: p.y});
                     }
                 }
             });
-
-            if (ME.y > MAGMA_Y) { isDead = true; connections.forEach(c => c.send({type:'VOID', id: peer.id})); checkMatchEnd(); }
+            if (ME.y > MAGMA_Y) { isDead = true; for(let id in connections) connections[id].send({type:'VOID', id: peer.id}); if(!isHost) checkMatchEnd(); }
         }
 
         projectiles.forEach((p, i) => { 
-            p.x += p.vx; p.y += p.vy; if(p.type==='NUKE') p.vy+=0.15;
+            p.x += p.vx; p.y += p.vy;
             if (!isDead && Math.hypot(p.x-ME.x, p.y-ME.y)<35 && p.owner!==peer.id){ ME.vx=p.vx; ME.vy=-8; projectiles.splice(i,1); }
-            PLATFORMS.forEach(plat => { if(p.type==='NUKE' && p.y > plat.y && p.x > plat.x && p.x < plat.x + plat.w) { explosions.push({x:p.x, y:p.y, r:0, max:250}); projectiles.splice(i,1); } });
         });
-
-        explosions.forEach((e, i) => { e.r += 14; if (!isDead && Math.hypot(ME.x - e.x, ME.y - e.y) < e.r && e.r < 70) { ME.vx = (ME.x-e.x)*0.8; ME.vy=-18; } if (e.r > e.max) explosions.splice(i, 1); });
     }
 
     function checkMatchEnd() {
         if (!isHost) return;
         let alive = [];
         if (!isDead) alive.push(ME.name);
-        Object.keys(players).forEach(id => { if(!players[id].dead) alive.push(players[id].name); });
+        for (let id in players) if (!players[id].dead) alive.push(players[id].name);
 
         if (alive.length <= 1) {
             const winner = alive.length === 1 ? alive[0] : "DRAW";
-            showWinner(winner);
+            document.getElementById('winner-name').innerText = winner;
+            document.getElementById('victory-screen').style.display = 'flex';
             setTimeout(() => {
-                if(currentRound < 5) { currentRound++; connections.forEach(c => c.send({type:'SYNC_ROUND', round:currentRound})); syncRound(currentRound); }
+                if(currentRound < 5) { currentRound++; for(let id in connections) connections[id].send({type:'SYNC_ROUND', round:currentRound}); syncRound(currentRound); }
                 else { alert("SERIES FINISHED!"); location.reload(); }
             }, 3000);
         }
     }
 
-    function showWinner(name) { const screen = document.getElementById('victory-screen'); document.getElementById('winner-name').innerText = name; screen.style.display = 'flex'; }
-
     function drawPlayer(p, color, isMe) {
         ctx.save(); ctx.translate(p.x, p.y);
         ctx.fillStyle="#fff"; ctx.font="14px 'Tiny5'"; ctx.textAlign="center"; ctx.fillText(p.name, 0, -40);
-        ctx.strokeStyle = "#000"; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(0, 0, p.r, 0, 6.3); ctx.stroke();
+        ctx.strokeStyle = "#000"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0, 0, p.r, 0, 6.3); ctx.stroke();
         ctx.rotate(p.rot); ctx.fillStyle = color; ctx.beginPath(); ctx.arc(0, 0, p.r, 0, 6.3); ctx.fill();
-        ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(7,-6,3,0,6.3); ctx.fill(); ctx.beginPath(); ctx.arc(-7,-6,3,0,6.3); ctx.fill();
         ctx.restore();
         ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(isMe ? myAngle : p.angle);
         const s = p.swing ? Math.sin(p.swing * 0.4) * 60 : 0; ctx.rotate(s * Math.PI / 180);
         ctx.fillStyle = color; ctx.strokeStyle="#000"; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(42, 0, 10, 0, 6.3); ctx.fill(); ctx.stroke(); 
-        const itm = isMe ? (ME.item?.name) : p.item;
-        if(itm === 'SWORD') { ctx.fillStyle = "#d1d1d1"; ctx.fillRect(45, -6, 75, 12); ctx.strokeRect(45, -6, 75, 12); }
-        else if(itm === 'STICK') { ctx.fillStyle = "#5d4037"; ctx.fillRect(45, -5, 55, 10); ctx.strokeRect(45, -5, 55, 10); }
         ctx.restore();
     }
 
@@ -336,7 +352,6 @@
         PLATFORMS.forEach(p => {
             if(p.y > canvas.height + 100) return;
             let shake = (p.contactTime > 180 && !p.falling) ? Math.sin(Date.now()*0.2)*6 : 0;
-            ctx.fillStyle = "#1b1b1b"; ctx.fillRect(p.x+shake, p.y+40, p.w, p.h-40);
             ctx.fillStyle = "#3e2723"; ctx.fillRect(p.x+shake, p.y+20, p.w, 30);
             ctx.fillStyle = "#4caf50"; ctx.fillRect(p.x+shake, p.y, p.w, 15);
         });
@@ -344,17 +359,21 @@
             let flicker = Math.sin(magmaFrame*0.05 + x)*12;
             ctx.fillStyle = "#ff4500"; ctx.fillRect(x, MAGMA_Y + flicker, 42, 400);
         }
-        projectiles.forEach(p => { ctx.fillStyle = (p.type==='NUKE')?"#222":"#fff"; ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 6.3); ctx.fill(); });
-        explosions.forEach(e => { ctx.fillStyle = `rgba(255, 69, 0, ${1 - e.r/e.max})`; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 6.3); ctx.fill(); });
+        beams.forEach((b, i) => { 
+            ctx.strokeStyle = "red"; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(b.sx, b.sy);
+            ctx.lineTo(b.sx + Math.cos(b.angle)*2000, b.sy + Math.sin(b.angle)*2000); ctx.stroke();
+            b.life--; if(b.life <= 0) beams.splice(i,1);
+        });
+        projectiles.forEach(p => { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 6.3); ctx.fill(); });
         if(!isDead) drawPlayer(ME, ME.color, true); 
-        Object.keys(players).forEach(id => { if(!players[id].dead) drawPlayer(players[id], players[id].color, false); });
+        for (let id in players) if (!players[id].dead) drawPlayer(players[id], players[id].color, false);
     }
 
     function gameLoop() { update(); draw(); if(isGameRunning) requestAnimationFrame(gameLoop); }
     function showMenu(id) { document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none'); document.getElementById(id).style.display = 'block'; }
     function updateUI() {
         document.getElementById('round-num').innerText = currentRound;
-        document.getElementById('inv-slot').innerText = ME.item ? `${ME.item.name}\n${ME.item.ammo||''}` : "EMPTY";
+        document.getElementById('inv-slot').innerText = ME.item ? `${ME.item.name}` : "EMPTY";
     }
 </script>
 </body>
