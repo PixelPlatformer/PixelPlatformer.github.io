@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Platformer: Chaos Lobby</title>
+    <title>Pixel Platformer: Whiteout Edition</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tiny5&display=swap" rel="stylesheet">
     
@@ -11,20 +11,27 @@
         /* --- GLOBAL & RESET --- */
         body { 
             margin: 0; 
-            background: #000; /* Pure Black Background */
+            background: #000; 
             color: #fff; 
             font-family: 'Tiny5', sans-serif; 
             overflow: hidden; 
         }
-        canvas { display: block; margin: 0 auto; background: #111; border: 2px solid #333; }
+        canvas { display: block; margin: 0 auto; background: #111; border: 2px solid #fff; }
         
-        /* --- GLOWING TEXT UTILITY --- */
+        /* --- WHITE NEON THEME --- */
         .neon-text {
             color: #fff;
-            text-shadow: 0 0 5px #fff, 0 0 10px #00d2ff, 0 0 20px #00d2ff;
+            text-shadow: 0 0 5px #fff, 0 0 10px #aaa, 0 0 20px #fff;
         }
         
-        /* --- LOADING SCREEN --- */
+        /* SCOREBOARD */
+        #scoreboard {
+            position: absolute; top: 10px; right: 20px;
+            text-align: right; pointer-events: none;
+        }
+        .score-entry { font-size: 24px; color: #fff; margin-bottom: 5px; }
+
+        /* LOADING SCREEN */
         #loading-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: #000;
@@ -32,7 +39,6 @@
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             transition: opacity 0.5s ease;
         }
-
         .loader-box { position: relative; width: 100px; height: 100px; margin-bottom: 20px; }
         .loader-box span {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -40,7 +46,7 @@
         }
         .loader-box span::before {
             content: ''; position: absolute; top: 0; left: 0; width: 15px; height: 15px;
-            background: #00d2ff; box-shadow: 0 0 10px #00d2ff, 0 0 20px #00d2ff;
+            background: #fff; box-shadow: 0 0 10px #fff, 0 0 20px #fff;
             opacity: 0; animation: fadeSquare 1s linear infinite;
             animation-delay: calc(1s / 12 * var(--i));
         }
@@ -49,44 +55,33 @@
         }
         .loader-hidden { opacity: 0; pointer-events: none; }
 
-
-        /* --- MENUS --- */
+        /* MENUS */
         .menu-screen { 
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.95); padding: 40px; 
-            border: 2px solid #00d2ff; box-shadow: 0 0 15px rgba(0, 210, 255, 0.3);
+            background: #000; padding: 40px; 
+            border: 4px solid #fff; box-shadow: 0 0 15px #fff;
             text-align: center; display: none; z-index: 100; min-width: 300px;
         }
-        #main-menu { display: block; } /* Start here */
+        #main-menu { display: block; }
         
         .btn { 
-            background: #000; color: #00d2ff; border: 2px solid #00d2ff; 
+            background: #000; color: #fff; border: 2px solid #fff; 
             padding: 10px 20px; font-family: 'Tiny5'; font-size: 20px; cursor: pointer; margin: 10px;
-            text-transform: uppercase; box-shadow: 0 0 5px #00d2ff;
-            transition: 0.2s;
+            text-transform: uppercase; transition: 0.2s;
         }
-        .btn:hover { background: #00d2ff; color: #000; box-shadow: 0 0 20px #00d2ff; }
-        .btn:disabled { border-color: #555; color: #555; box-shadow: none; cursor: not-allowed; }
-        
-        .btn-kick { border-color: red; color: red; box-shadow: 0 0 5px red; padding: 5px 10px; font-size: 14px; margin-left: 10px;}
-        .btn-kick:hover { background: red; color: white; }
-
+        .btn:hover { background: #fff; color: #000; box-shadow: 0 0 20px #fff; }
         input { 
-            background: #000; color: #fff; border: 2px solid #00d2ff;
+            background: #000; color: #fff; border: 2px solid #fff;
             font-family: 'Tiny5'; font-size: 20px; padding: 10px; text-align: center; outline: none;
         }
-
-        /* Player List in Lobby */
-        #player-list { list-style: none; padding: 0; margin: 20px 0; border: 1px solid #333; padding: 10px; }
-        #player-list li { padding: 5px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
 
         /* UI OVERLAY */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; }
         #rng-box {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(0,0,0,0.8); border: 2px solid #00d2ff; padding: 10px;
+            background: #000; border: 3px solid #fff; padding: 15px; width: 150px;
             text-align: center; pointer-events: auto; cursor: pointer;
-            box-shadow: 0 0 10px #00d2ff;
+            box-shadow: 0 0 10px #fff;
         }
     </style>
 </head>
@@ -99,291 +94,502 @@
             <span style="--i:7;"></span><span style="--i:8;"></span><span style="--i:9;"></span>
             <span style="--i:10;"></span><span style="--i:11;"></span><span style="--i:12;"></span>
         </div>
-        <p class="neon-text" style="font-size: 20px; letter-spacing: 2px;">LOADING GAME...</p>
+        <p class="neon-text" style="font-size: 20px; letter-spacing: 2px;">LOADING RESOURCES...</p>
     </div>
 
     <div id="main-menu" class="menu-screen">
-        <h1 class="neon-text" style="font-size: 50px; margin: 0;">PIXEL CHAOS</h1>
-        <p style="color: #888; margin-bottom: 30px;">MULTIPLAYER LOBBY UPDATE</p>
+        <h1 class="neon-text" style="font-size: 50px; margin: 0;">WHITEOUT FIGHT</h1>
+        <p style="color: #aaa; margin-bottom: 30px;">KNOCKOUT ARENA</p>
         <button class="btn" onclick="startSingle()">Single Player</button>
         <button class="btn" onclick="showMenu('multi-menu')">Multiplayer</button>
     </div>
 
     <div id="multi-menu" class="menu-screen">
         <h2 class="neon-text">MULTIPLAYER</h2>
-        <button class="btn" onclick="setupHost()">Create Lobby</button>
-        <button class="btn" onclick="showMenu('join-menu')">Join Lobby</button>
-        <br><button class="btn" onclick="showMenu('main-menu')" style="border-color: #555; color: #888; box-shadow: none;">Back</button>
+        <button class="btn" onclick="setupHost()">Host Game</button>
+        <button class="btn" onclick="showMenu('join-menu')">Join Game</button>
+        <br><button class="btn" onclick="showMenu('main-menu')" style="border-color: #555; color: #888;">Back</button>
     </div>
 
-    <div id="lobby-screen" class="menu-screen">
+    <div id="host-menu" class="menu-screen">
         <h2 class="neon-text">LOBBY</h2>
-        <p>CODE: <span id="host-code" style="color: #00d2ff; font-size: 30px; border: 1px dashed #00d2ff; padding: 0 10px;">...</span></p>
-        
-        <div style="text-align: left; margin: 10px 0;">PLAYERS (<span id="player-count">1</span>/6):</div>
-        <ul id="player-list">
-            <li>HOST (You)</li>
-        </ul>
-
-        <div id="lobby-status" style="color: yellow; font-size: 14px; margin-bottom: 10px;">Waiting for players...</div>
-        
-        <button id="start-btn" class="btn" onclick="hostStartGame()" disabled>START GAME</button>
-        <button class="btn" onclick="location.reload()" style="border-color: red; color: red; box-shadow: none;">Close Lobby</button>
+        <p>CODE: <span id="host-code" style="color: #fff; font-size: 30px; border-bottom: 2px solid #fff;">...</span></p>
+        <p>Waiting for players...</p>
     </div>
 
     <div id="join-menu" class="menu-screen">
-        <h2 class="neon-text">JOIN LOBBY</h2>
-        <input type="text" id="join-code" placeholder="ENTER 4-LETTER CODE" maxlength="4">
-        <br>
+        <h2 class="neon-text">JOIN</h2>
+        <input type="text" id="join-code" placeholder="ENTER CODE" maxlength="4">
         <button class="btn" onclick="joinGame()">Connect</button>
-        <br><button class="btn" onclick="showMenu('multi-menu')" style="border-color: #555; color: #888; box-shadow: none;">Back</button>
-        <p id="join-status" style="color: #888; font-size: 12px;"></p>
-    </div>
-
-    <div id="client-waiting" class="menu-screen">
-        <h2 class="neon-text">CONNECTED</h2>
-        <p>Waiting for host to start...</p>
-        <div class="loader-box" style="transform: scale(0.5);">
-            <span style="--i:1;"></span><span style="--i:2;"></span><span style="--i:3;"></span>
-            <span style="--i:4;"></span><span style="--i:5;"></span><span style="--i:6;"></span>
-            <span style="--i:7;"></span><span style="--i:8;"></span><span style="--i:9;"></span>
-            <span style="--i:10;"></span><span style="--i:11;"></span><span style="--i:12;"></span>
-        </div>
+        <br><button class="btn" onclick="showMenu('multi-menu')" style="border-color: #555;">Back</button>
     </div>
 
     <div id="ui-layer">
-        <div id="rng-box" onclick="spinRNG()">
-            <div style="font-size: 12px; color: #aaa;">PRESS 'E'</div>
-            <div id="item-display" style="font-size: 24px; color: #ffff00;">???</div>
+        <div id="scoreboard">
+            <div class="score-entry">ME: <span id="score-me">0</span></div>
+            <div class="score-entry" style="color: #ff4444;">ENEMY: <span id="score-enemy">0</span></div>
         </div>
-        <div style="position: absolute; top: 20px; left: 20px; font-size: 20px;" class="neon-text">
-            POWER: <span id="power-display">NONE</span>
+
+        <div id="rng-box" onclick="spinRNG()">
+            <div style="font-size: 12px; color: #aaa; margin-bottom: 5px;">CLICK FOR ITEM</div>
+            <div id="item-display" class="neon-text" style="font-size: 20px;">NOTHING</div>
+        </div>
+        
+        <div style="position: absolute; top: 20px; left: 20px; font-size: 16px;">
+            <div id="cooldown-msg" style="color: red; opacity: 0;">ROLL COOLDOWN</div>
         </div>
     </div>
 
     <canvas id="gameCanvas" width="1000" height="600"></canvas>
 
 <script>
-    // --- LOADING LOGIC ---
-    window.addEventListener('load', function() {
-        setTimeout(function() {
-            const loader = document.getElementById('loading-screen');
-            loader.classList.add('loader-hidden');
-            loader.addEventListener('transitionend', function() {
-                if(loader.parentNode) loader.parentNode.removeChild(loader);
-            });
-        }, 1500); // 1.5s Load time
+    // --- CUSTOM ASSETS (PUT YOUR IMAGE LINKS HERE) ---
+    // Leave src as '' to use the default colors.
+    const ASSETS = {
+        player: { src: '', color: '#fff' },     // Your Character
+        enemy:  { src: '', color: '#ff4444' },  // Enemy Character (Red)
+        sword:  { src: '' },
+        snowball: { src: '' },
+        nuke:   { src: '' },
+        laser:  { src: '' }
+    };
+
+    // Helper to load images
+    const sprites = {};
+    for (const key in ASSETS) {
+        if (ASSETS[key].src) {
+            const img = new Image();
+            img.src = ASSETS[key].src;
+            sprites[key] = img;
+        }
+    }
+
+    // --- LOAD HANDLER ---
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            const l = document.getElementById('loading-screen');
+            l.style.opacity = '0';
+            setTimeout(() => l.remove(), 500);
+        }, 1000);
     });
 
-    // --- GAME CONFIG ---
+    // --- PHYSICS CONFIG (Adjusted for "Snappy" feel) ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    // SLOWER PHYSICS
-    const GRAVITY = 0.6;   // Reduced from 0.8 (Floatier)
-    const JUMP_FORCE = -14; // Adjusted for new gravity
-    const SPEED = 3.5;      // Reduced from 5 (Slower movement)
+    const GRAVITY = 0.9;      // Heavy gravity for less float
+    const JUMP_FORCE = -18;   // Strong jump
+    const SPEED = 5;
     const GROUND = 500;
+    const ROLL_COOLDOWN = 1500; // 1.5 seconds
 
+    // --- GAME STATE ---
     let myId = null;
     let peer = null;
-    let connections = []; // Array of connections (Host only)
-    let hostConn = null;  // Connection to host (Client only)
+    let conn = null;
     let isHost = false;
     let isGameRunning = false;
+    let projectiles = []; // For snowballs
+    let scores = { me: 0, enemy: 0 };
+    let canRoll = true;
 
     // --- PLAYER OBJECTS ---
-    // In a real game, this would be an array. For this demo, we sync 1 vs 1 logic 
-    // but the lobby supports "waiting" for more.
-    const ME = { x: 100, y: 300, w: 40, h: 40, vx: 0, vy: 0, color: 'white', power: 'none', item: 'Fists', rolling: false, facingRight: true };
-    const OTHER = { x: 800, y: 300, w: 40, h: 40, color: 'gray', power: 'none', item: 'Fists', rolling: false };
+    const ME = { 
+        x: 100, y: 300, w: 40, h: 40, 
+        vx: 0, vy: 0, 
+        item: 'Nothing', frozen: false, facingRight: true 
+    };
+    const OTHER = { 
+        x: 800, y: 300, w: 40, h: 40, 
+        color: '#ff4444', item: 'Nothing', frozen: false 
+    };
+
+    // --- ITEM RARITY LOGIC ---
+    function getRandomItem() {
+        const r = Math.random() * 1000; // 0 to 1000
+        
+        // 1. Ultra Rare (Laser) - 1/1000
+        if (r <= 1) return 'LASER';
+        
+        // 2. Legendary (Teleporter) - 1/500 (approx)
+        if (r <= 3) return 'TELEPORTER'; // 2, 3
+        
+        // 3. Epic (Nuke) - 1/100 (approx)
+        if (r <= 13) return 'NUKE'; 
+        
+        // 4. Common Pool (remaining ~987)
+        // Re-roll for standard items to keep percentages clean
+        const standard = Math.random();
+        
+        if (standard < 0.50) return 'NOTHING';        // 50%
+        if (standard < 0.70) return 'STICK';          // 20%
+        if (standard < 0.90) return 'SNOWBALL';       // 20%
+        return 'SWORD';                               // 10%
+    }
+
+    // --- ITEM USAGE LOGIC ---
+    function useItem() {
+        if (ME.frozen) return;
+
+        // SWORD
+        if (ME.item === 'SWORD') {
+            // Simple hitbox check
+            if (checkHit(ME, OTHER, 80)) {
+                sendHit('KNOCKBACK', 20); // Big physical hit
+            }
+        }
+
+        // STICK
+        if (ME.item === 'STICK') {
+            if (checkHit(ME, OTHER, 60)) {
+                sendHit('KNOCKBACK', 15); // 1.5x knockback
+            }
+        }
+
+        // SNOWBALL
+        if (ME.item === 'SNOWBALL') {
+            // Spawn projectile
+            projectiles.push({
+                x: ME.x + 20, y: ME.y + 10,
+                vx: ME.facingRight ? 12 : -12,
+                vy: -2,
+                owner: 'ME',
+                type: 'snowball'
+            });
+            ME.item = 'Nothing'; // Consumed
+            updateItemDisplay();
+            
+            // Send projectile spawn to other player (visual sync)
+            if (conn) conn.send({ type: 'SPAWN_PROJ', x: ME.x, y: ME.y, dir: ME.facingRight ? 1 : -1 });
+        }
+
+        // NUKE
+        if (ME.item === 'NUKE') {
+            sendHit('NUKE', 100);
+            ME.item = 'Nothing';
+            updateItemDisplay();
+        }
+
+        // TELEPORTER
+        if (ME.item === 'TELEPORTER') {
+            sendHit('TELEPORT', 0);
+            ME.item = 'Nothing';
+            updateItemDisplay();
+        }
+
+        // LASER
+        if (ME.item === 'LASER') {
+            // Infinite range hit
+            // Check if facing correct direction
+            let hit = false;
+            if (ME.facingRight && OTHER.x > ME.x) hit = true;
+            if (!ME.facingRight && OTHER.x < ME.x) hit = true;
+            
+            if (hit) {
+                // Visual Laser
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.moveTo(ME.x + 20, ME.y + 20);
+                ctx.lineTo(ME.facingRight ? 1000 : 0, ME.y + 20);
+                ctx.stroke();
+                sendHit('KNOCKBACK', 50); // Massive hit
+            }
+            ME.item = 'Nothing';
+            updateItemDisplay();
+        }
+    }
+
+    function checkHit(attacker, defender, range) {
+        const dx = Math.abs((attacker.x + attacker.w/2) - (defender.x + defender.w/2));
+        const dy = Math.abs((attacker.y + attacker.h/2) - (defender.y + defender.h/2));
+        return (dx < range && dy < 50);
+    }
+
+    function sendHit(effectType, force) {
+        if (conn) {
+            conn.send({ type: 'HIT', effect: effectType, force: force, dir: ME.facingRight ? 1 : -1 });
+        } else {
+            // Single player testing
+            applyHitTo(OTHER, effectType, force, ME.facingRight ? 1 : -1);
+        }
+    }
+
+    // --- RECEIVE HIT LOGIC (Runs when YOU get hit) ---
+    function applyHitTo(target, effect, force, dir) {
+        if (effect === 'KNOCKBACK') {
+            target.vx = dir * force;
+            target.vy = -5; // Small pop up
+        }
+        if (effect === 'FREEZE') {
+            target.vx = dir * force;
+            target.frozen = true;
+            target.color = '#00ffff'; // Turn blue
+            setTimeout(() => {
+                target.frozen = false;
+                target.color = isHost ? '#ff4444' : '#fff'; // Revert color
+            }, 500); // 0.5s freeze
+        }
+        if (effect === 'NUKE') {
+            target.vx = 50; // Fly away
+            target.vy = -50;
+        }
+        if (effect === 'TELEPORT') {
+            target.x = -100; // Teleport off map
+            target.y = -100;
+        }
+    }
+
+    // --- UI HELPERS ---
+    function updateItemDisplay() {
+        document.getElementById('item-display').innerText = ME.item;
+        
+        // Color coding rarities
+        const disp = document.getElementById('item-display');
+        if (['NUKE','TELEPORTER','LASER'].includes(ME.item)) disp.style.color = '#ff00ff'; // Purple for rare
+        else if (ME.item === 'NOTHING') disp.style.color = '#555';
+        else disp.style.color = '#fff';
+    }
+
+    function updateScore() {
+        document.getElementById('score-me').innerText = scores.me;
+        document.getElementById('score-enemy').innerText = scores.enemy;
+    }
+
+    function spinRNG() {
+        if (ME.frozen) return;
+        const display = document.getElementById('item-display');
+        let i = 0;
+        const interval = setInterval(() => {
+            display.innerText = ['...','?','...'][i%3];
+            i++;
+            if (i > 5) {
+                clearInterval(interval);
+                ME.item = getRandomItem();
+                updateItemDisplay();
+            }
+        }, 100);
+    }
 
     // --- MENUS ---
     function showMenu(id) {
         document.querySelectorAll('.menu-screen').forEach(el => el.style.display = 'none');
         document.getElementById(id).style.display = 'block';
     }
-
     function generateId() { return Math.random().toString(36).substr(2, 4).toUpperCase(); }
 
-    // --- HOST LOGIC ---
     function setupHost() {
-        showMenu('lobby-screen');
+        showMenu('host-menu');
         myId = generateId();
         document.getElementById('host-code').innerText = myId;
-        
         peer = new Peer(myId);
-        peer.on('connection', (conn) => {
-            // MAX PLAYERS CHECK (6 Max)
-            if (connections.length >= 5) { // 5 guests + 1 host = 6
-                conn.send({type: 'KICK', msg: 'Lobby Full'});
-                setTimeout(() => conn.close(), 500);
-                return;
-            }
-
-            connections.push(conn);
-            updateLobbyUI();
-
-            conn.on('close', () => {
-                connections = connections.filter(c => c !== conn);
-                updateLobbyUI();
-            });
+        peer.on('connection', (c) => {
+            conn = c;
+            initConnection();
+            startGame();
         });
         isHost = true;
-        updateLobbyUI();
     }
 
-    function updateLobbyUI() {
-        const count = connections.length + 1; // +1 for Host
-        document.getElementById('player-count').innerText = count;
-        
-        const list = document.getElementById('player-list');
-        list.innerHTML = '<li>HOST (You)</li>'; // Reset list
-
-        connections.forEach((conn, index) => {
-            const li = document.createElement('li');
-            li.innerHTML = `Player ${index+2} <button class="btn btn-kick" onclick="kickPlayer(${index})">KICK</button>`;
-            list.appendChild(li);
-        });
-
-        // MIN PLAYERS CHECK (Min 2)
-        const startBtn = document.getElementById('start-btn');
-        const status = document.getElementById('lobby-status');
-        
-        if (count >= 2) {
-            startBtn.disabled = false;
-            status.innerText = "Ready to start!";
-            status.style.color = "#00d2ff";
-        } else {
-            startBtn.disabled = true;
-            status.innerText = "Waiting for players (Min 2)...";
-            status.style.color = "yellow";
-        }
-    }
-
-    function kickPlayer(index) {
-        const conn = connections[index];
-        if (conn) {
-            conn.send({type: 'KICK', msg: 'Host kicked you.'});
-            conn.close();
-            connections.splice(index, 1);
-            updateLobbyUI();
-        }
-    }
-
-    function hostStartGame() {
-        // Tell everyone to start
-        connections.forEach(conn => conn.send({type: 'START'}));
-        startGame();
-    }
-
-    // --- CLIENT LOGIC ---
     function joinGame() {
         const code = document.getElementById('join-code').value.toUpperCase();
-        const status = document.getElementById('join-status');
-        status.innerText = "Connecting...";
-        
         peer = new Peer();
         peer.on('open', () => {
-            hostConn = peer.connect(code);
-            
-            hostConn.on('open', () => {
-                showMenu('client-waiting');
+            conn = peer.connect(code);
+            conn.on('open', () => {
+                initConnection();
+                startGame();
             });
+        });
+        isHost = false;
+    }
 
-            hostConn.on('data', (data) => {
-                if (data.type === 'START') {
-                    startGame();
-                }
-                if (data.type === 'KICK') {
-                    alert("Disconnected: " + data.msg);
-                    location.reload();
-                }
-                // Game Data Sync
-                if (data.x !== undefined) {
-                    OTHER.x = data.x; OTHER.y = data.y; OTHER.color = data.color; OTHER.item = data.item;
-                }
-            });
-
-            hostConn.on('close', () => {
-                alert("Host disconnected.");
-                location.reload();
-            });
-            
-            isHost = false;
+    function initConnection() {
+        conn.on('data', (data) => {
+            // Position Sync
+            if (data.x !== undefined) {
+                OTHER.x = data.x; OTHER.y = data.y; 
+                OTHER.item = data.item;
+                OTHER.facingRight = data.facingRight;
+            }
+            // Hit Event
+            if (data.type === 'HIT') {
+                applyHitTo(ME, data.effect, data.force, data.dir);
+            }
+            // Projectile Spawn
+            if (data.type === 'SPAWN_PROJ') {
+                projectiles.push({
+                    x: data.x, y: data.y, vx: data.dir * 12, vy: -2, owner: 'OTHER', type: 'snowball'
+                });
+            }
+            // Score Sync
+            if (data.type === 'DEATH') {
+                scores.me++; // If they died, I get a point
+                updateScore();
+            }
         });
     }
 
-    // --- GAME ENGINE ---
     function startSingle() { startGame(); }
 
     function startGame() {
         document.querySelectorAll('.menu-screen').forEach(el => el.style.display = 'none');
         document.getElementById('ui-layer').style.display = 'block';
-        
-        // Randomize Power
-        const POWERS = ['LUCKY', 'FAST', 'STRONG', 'SMALL', 'GHOST'];
-        const p = POWERS[Math.floor(Math.random() * POWERS.length)];
-        ME.power = p;
-        document.getElementById('power-display').innerText = p;
-
-        ME.x = isHost ? 100 : 800; // Host left, Guest right
+        ME.x = isHost ? 100 : 800;
         isGameRunning = true;
         gameLoop();
-        
-        // Network Loop
-        setInterval(() => {
-            if (isHost) {
-                connections.forEach(c => c.send({x: ME.x, y: ME.y, color: ME.color, item: ME.item}));
-            } else if (hostConn) {
-                hostConn.send({x: ME.x, y: ME.y, color: ME.color, item: ME.item});
-            }
-        }, 20);
+        setInterval(sendData, 20);
     }
 
-    // --- INPUT & PHYSICS ---
+    function sendData() {
+        if (conn && conn.open) {
+            conn.send({ x: ME.x, y: ME.y, item: ME.item, facingRight: ME.facingRight });
+        }
+    }
+
+    // --- CONTROLS ---
     const keys = {};
     window.addEventListener('keydown', e => {
         keys[e.key.toLowerCase()] = true;
+        if (e.key === ' ' && ME.item !== 'Nothing') useItem(); // Space to use Item
         if (e.key === 'e') spinRNG();
+        if (e.key.toLowerCase() === 'shift') tryRoll();
     });
     window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
+    function tryRoll() {
+        if (canRoll && !ME.frozen) {
+            ME.rolling = true;
+            ME.vx = ME.facingRight ? 15 : -15; // Speed boost
+            canRoll = false;
+            
+            // Cooldown UI
+            const msg = document.getElementById('cooldown-msg');
+            msg.style.opacity = 1;
+
+            setTimeout(() => ME.rolling = false, 300); // 0.3s duration
+            setTimeout(() => {
+                canRoll = true;
+                msg.style.opacity = 0;
+            }, ROLL_COOLDOWN);
+        }
+    }
+
+    // --- GAME LOOP ---
     function update() {
-        // Slow movement logic
-        let moveSpeed = SPEED;
-        if (ME.power === 'FAST') moveSpeed *= 1.5;
+        if (ME.frozen) return; // Can't move if frozen
 
-        if (keys['a']) { ME.vx = -moveSpeed; ME.facingRight = false; }
-        else if (keys['d']) { ME.vx = moveSpeed; ME.facingRight = true; }
-        else { ME.vx *= 0.8; }
+        // MOVEMENT
+        let speed = SPEED;
+        if (ME.item === 'STICK') speed = SPEED * 0.9; // Holding heavy stick?
+        
+        if (keys['a']) { ME.vx = -speed; ME.facingRight = false; }
+        else if (keys['d']) { ME.vx = speed; ME.facingRight = true; }
+        else if (!ME.rolling) { ME.vx *= 0.8; } // Friction
 
-        if (keys['w'] && ME.y + ME.h >= GROUND) ME.vy = JUMP_FORCE;
+        // JUMP (No bouncing - crisp landing)
+        if (keys['w'] && ME.y + ME.h >= GROUND) {
+            ME.vy = JUMP_FORCE;
+        }
 
+        // PHYSICS
         ME.vy += GRAVITY;
         ME.x += ME.vx;
         ME.y += ME.vy;
 
-        if (ME.y + ME.h > GROUND) { ME.y = GROUND - ME.h; ME.vy = 0; }
-        if (ME.x < 0) ME.x = 0;
-        if (ME.x > canvas.width - ME.w) ME.x = canvas.width - ME.w;
+        // GROUND COLLISION (Crisp stop)
+        if (ME.y + ME.h > GROUND) {
+            ME.y = GROUND - ME.h;
+            ME.vy = 0; // Set strictly to 0 to prevent bounce
+        }
+
+        // BOUNDARIES & DEATH
+        if (ME.x < -100 || ME.x > canvas.width + 100 || ME.y < -100) {
+            // Respawn
+            ME.x = 400; ME.y = 0; ME.vx = 0; ME.vy = 0;
+            ME.frozen = false;
+            scores.enemy++; // Other player gets point
+            updateScore();
+            if (conn) conn.send({ type: 'DEATH' });
+        }
+
+        // PROJECTILES
+        for (let i = projectiles.length - 1; i >= 0; i--) {
+            let p = projectiles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.2; // Gravity for snowball
+
+            // Hit detection (Snowball vs Player)
+            let target = (p.owner === 'ME') ? OTHER : ME;
+            
+            if (target.x < p.x + 10 && target.x + target.w > p.x &&
+                target.y < p.y + 10 && target.y + target.h > p.y) {
+                
+                // If *I* got hit by *OTHER'S* snowball
+                if (p.owner === 'OTHER') {
+                    applyHitTo(ME, 'FREEZE', 10, (p.vx > 0 ? 1 : -1));
+                }
+                projectiles.splice(i, 1);
+                continue;
+            }
+
+            // Remove if off screen or hits ground
+            if (p.y > GROUND || p.x < 0 || p.x > 1000) {
+                projectiles.splice(i, 1);
+            }
+        }
     }
 
-    // --- DRAWING ---
     function draw() {
-        ctx.fillStyle = '#111';
+        // Background
+        ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Floor
+        ctx.fillStyle = '#000';
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.fillRect(0, GROUND, canvas.width, 100);
+        ctx.beginPath(); ctx.moveTo(0, GROUND); ctx.lineTo(1000, GROUND); ctx.stroke();
+
+        // Projectiles
+        ctx.fillStyle = '#fff';
+        projectiles.forEach(p => {
+            if (sprites.snowball) {
+                ctx.drawImage(sprites.snowball, p.x, p.y, 20, 20);
+            } else {
+                ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI*2); ctx.fill();
+            }
+        });
+
+        // Draw Player (ME)
+        drawPlayer(ME, ASSETS.player.color, sprites.player);
+
+        // Draw Player (OTHER)
+        drawPlayer(OTHER, ASSETS.enemy.color, sprites.enemy);
+    }
+
+    function drawPlayer(p, defaultColor, sprite) {
+        if (sprite) {
+            ctx.drawImage(sprite, p.x, p.y, p.w, p.h);
+        } else {
+            ctx.fillStyle = defaultColor;
+            ctx.fillRect(p.x, p.y, p.w, p.h);
+        }
         
-        ctx.fillStyle = '#333';
-        ctx.fillRect(0, GROUND, canvas.width, 100); // Floor
-
-        // Draw Players
-        ctx.fillStyle = ME.color;
-        ctx.fillRect(ME.x, ME.y, ME.w, ME.h);
-        ctx.fillStyle = 'white'; ctx.font='10px Arial'; ctx.fillText(ME.item, ME.x, ME.y-10);
-
-        ctx.fillStyle = OTHER.color;
-        ctx.fillRect(OTHER.x, OTHER.y, OTHER.w, OTHER.h);
+        // Draw Item Held
+        if (p.item !== 'NOTHING') {
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px Arial';
+            ctx.fillText(p.item, p.x, p.y - 10);
+        }
+        
+        // Frozen status
+        if (p.frozen) {
+            ctx.strokeStyle = '#00ffff';
+            ctx.strokeRect(p.x-5, p.y-5, p.w+10, p.h+10);
+        }
     }
 
     function gameLoop() {
@@ -392,31 +598,6 @@
         draw();
         requestAnimationFrame(gameLoop);
     }
-
-    // --- RNG LOGIC ---
-    function spinRNG() {
-        const display = document.getElementById('item-display');
-        const items = ['Rock', 'Stick', 'Snowball', 'Sword', 'Bomb'];
-        let i = 0;
-        const interval = setInterval(() => {
-            display.innerText = items[Math.floor(Math.random() * items.length)];
-            i++;
-            if (i > 10) {
-                clearInterval(interval);
-                ME.item = items[Math.floor(Math.random() * items.length)];
-                display.innerText = ME.item;
-            }
-        }, 50);
-    }
-    
-    // Client Data Listener (Separate from Lobby logic)
-    setInterval(() => {
-        if (isHost) {
-            connections.forEach(c => {
-                c.on('data', (d) => { if(d.x !== undefined) { OTHER.x = d.x; OTHER.y = d.y; } });
-            });
-        }
-    }, 1000);
 
 </script>
 </body>
