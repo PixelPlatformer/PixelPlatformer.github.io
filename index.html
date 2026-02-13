@@ -22,7 +22,7 @@
         #main-menu { display: block; }
         .btn { background: #000; color: #fff; border: 1px solid #fff; padding: 12px 20px; font-family: 'Tiny5'; font-size: 22px; cursor: pointer; margin: 10px 0; text-transform: uppercase; width: 100%; transition: 0.2s; }
         .btn:hover { background: #fff; color: #000; box-shadow: 0 0 20px #fff; }
-        .btn-kick { width: auto; font-size: 12px; padding: 2px 8px; border-color: #ff4444; color: #ff4444; margin-left: 10px; background: none; cursor: pointer; }
+        .btn-kick { width: auto; font-size: 12px; padding: 2px 8px; border-color: #ff4444; color: #ff4444; margin-left: 10px; background: none; cursor: pointer; border: 1px solid #ff4444; }
         
         input { background: #000; color: #fff; border: 1px solid #fff; font-family: 'Tiny5'; font-size: 20px; padding: 10px; width: 100%; text-align: center; box-sizing: border-box; outline: none; }
 
@@ -36,10 +36,12 @@
         
         #player-list { margin: 20px 0; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 5px; text-align: left; }
         .lobby-player { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 5px; }
+
+        #admin-panel { position: absolute; top: 80px; left: 20px; background: rgba(0,0,0,0.9); border: 1px solid red; padding: 15px; pointer-events: auto; display: none; z-index: 30; }
     </style>
 </head>
 <body>
-    <div id="version-tag" style="position:fixed; bottom:10px; left:10px; font-size:14px; color:rgba(255,255,255,0.3);">v1.11.0</div>
+    <div id="version-tag" style="position:fixed; bottom:10px; left:10px; font-size:14px; color:rgba(255,255,255,0.3);">v1.13.0</div>
     <canvas id="bg-canvas"></canvas>
     
     <div id="main-menu" class="menu-screen">
@@ -74,16 +76,20 @@
     <div id="ui-layer">
         <div id="match-info">ROUND <span id="round-num">1</span>/5</div>
         <div id="scoreboard"></div>
+        <div id="admin-panel">
+            <div style="color:red; font-size:18px; margin-bottom:10px;">GOD MODE</div>
+            <button class="btn" style="font-size:14px;" onclick="cheatFly = !cheatFly">TOGGLE FLY</button>
+            <button class="btn" style="font-size:14px;" onclick="cheatLuck = !cheatLuck">MAX LUCK</button>
+        </div>
         <div id="inv-slot">EMPTY</div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
 
 <script>
-    // --- FAVICON LOGO GENERATOR ---
+    // --- BRANDING ---
     function generateFavicon() {
-        const fCanvas = document.createElement('canvas');
-        fCanvas.width = 32; fCanvas.height = 32;
+        const fCanvas = document.createElement('canvas'); fCanvas.width = 32; fCanvas.height = 32;
         const fCtx = fCanvas.getContext('2d');
         fCtx.fillStyle = '#fff'; fCtx.beginPath(); fCtx.arc(16, 16, 14, 0, 6.3); fCtx.fill();
         fCtx.fillStyle = '#000'; fCtx.beginPath(); fCtx.arc(12, 12, 3, 0, 6.3); fCtx.fill();
@@ -100,10 +106,8 @@
     let PLATFORMS = [];
     function buildMap() {
         PLATFORMS = [];
-        const segmentWidth = 140;
-        for(let i=0; i<20; i++) {
-            PLATFORMS.push({ x: -800 + (i * segmentWidth), y: 500, w: segmentWidth - 10, h: 60, contactTime: 0, falling: false, vy: 0 });
-        }
+        const segW = 140;
+        for(let i=0; i<20; i++) PLATFORMS.push({ x: -800 + (i * segW), y: 500, w: segW - 10, h: 60, contactTime: 0, falling: false, vy: 0 });
     }
 
     const MAGMA_Y = 800;
@@ -113,6 +117,7 @@
     let mouseX = 0, mouseY = 0, myAngle = 0, magmaFrame = 0, warmupTime = 0;
     let projectiles = [], beams = [], players = {}, scores = {};
     let attackTimer = 0, rollTimer = 0, currentRound = 1, isDead = false;
+    let cheatFly = false, cheatLuck = false;
 
     const ME = { id: 'me', x: 0, y: 0, r: 22, vx: 0, vy: 0, rot: 0, item: null, name: 'ME', color: '#fff', swing: 0, grounded: false };
 
@@ -126,8 +131,7 @@
         ME.color = randColor();
         myId = Math.random().toString(36).substr(2, 4).toUpperCase();
         document.getElementById('host-code-display').innerText = myId;
-        showMenu('host-lobby');
-        updateLobbyList();
+        showMenu('host-lobby'); updateLobbyList();
         peer = new Peer(myId);
         peer.on('connection', c => {
             if (Object.keys(connections).length >= 3) return c.close();
@@ -135,8 +139,7 @@
                 if (data.type === 'HANDSHAKE_RES') {
                     connections[c.peer] = c;
                     players[c.peer] = { name: data.name, color: data.color, x: 0, y: 0, dead: false, rot: 0 };
-                    updateLobbyList();
-                    initConn(c);
+                    updateLobbyList(); initConn(c);
                 }
             });
             c.on('open', () => c.send({ type: 'HANDSHAKE_REQ' }));
@@ -154,9 +157,7 @@
             c.on('data', data => {
                 if (data.type === 'HANDSHAKE_REQ') {
                     c.send({ type: 'HANDSHAKE_RES', name: ME.name, color: ME.color });
-                    isHost = false;
-                    initConn(c);
-                    showMenu('host-lobby');
+                    isHost = false; initConn(c); showMenu('host-lobby');
                 }
                 if (data.type === 'KICK') { alert("Kicked from lobby"); location.reload(); }
             });
@@ -182,8 +183,8 @@
         c.on('data', data => {
             if (data.type === 'START') startGame();
             if (data.type === 'SYNC_ROUND') syncRound(data.round);
-            if (data.type === 'UPDATE') { players[data.id] = data.state; }
-            if (data.type === 'VOID') { if(players[data.id]) players[id].dead = true; if(isHost) checkMatchEnd(); }
+            if (data.type === 'UPDATE') players[data.id] = data.state;
+            if (data.type === 'VOID') { if(players[data.id]) players[data.id].dead = true; if(isHost) checkMatchEnd(); }
             if (data.type === 'HIT' && data.target === 'me') { ME.vx = data.vx; ME.vy = data.vy; }
             if (data.type === 'PLAT_STATE') { let p = PLATFORMS[data.idx]; p.contactTime = data.time; p.falling = data.fall; p.vy = data.vy; p.y = data.py; }
         });
@@ -195,7 +196,8 @@
         document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none');
         document.getElementById('ui-layer').style.display = 'block';
         canvas.style.display = 'block';
-        isGameRunning = true; buildMap();
+        isGameRunning = true; 
+        buildMap();
         syncRound(1);
         requestAnimationFrame(gameLoop);
         setInterval(() => {
@@ -205,25 +207,43 @@
     }
 
     function syncRound(num) {
-        currentRound = num; isDead = false; warmupTime = 180;
+        currentRound = num; 
+        isDead = false; 
+        warmupTime = 180;
         buildMap();
+        
+        // Correct Spawn Positioning
         const spawnX = [-300, 100, 500, 900];
-        const myIdx = isHost ? 0 : Object.keys(players).length;
-        ME.x = spawnX[myIdx % 4]; ME.y = 100; // Spawn safely above bridge
-        ME.vx = 0; ME.vy = 0;
+        const myIdList = Object.keys(players);
+        let myIdx = isHost ? 0 : myIdList.indexOf(peer.id) + 1;
+        if(myIdx === -1) myIdx = 1; // Fallback
+
+        ME.x = spawnX[myIdx % 4]; 
+        ME.y = 100; // Character starts at 100 and falls
+        ME.vx = 0; 
+        ME.vy = 0;
+        
         for(let id in players) players[id].dead = false;
         document.getElementById('victory-screen').style.display = 'none';
         updateUI();
     }
 
-    // --- INPUT ---
-    window.onkeydown = e => { 
+    // --- INPUT & ADMIN ---
+    window.addEventListener('keydown', e => {
+        if(isGameRunning) {
+            if(e.key === '/') { 
+                const p = prompt("ADMIN KEY:"); 
+                if(p === '67412') document.getElementById('admin-panel').style.display='block'; 
+                return; 
+            }
+        }
         if(isDead || warmupTime > 0) return;
         if(e.key === ' ' && attackTimer <= 0) handleAttack();
         if(e.key === 'e') spinRNG();
         if(e.key === 'Shift' && rollTimer <= 0) roll();
-        keys[e.key.toLowerCase()] = true; 
-    };
+        keys[e.key.toLowerCase()] = true;
+    });
+
     const keys = {};
     window.onkeyup = e => keys[e.key.toLowerCase()] = false;
     window.onmousemove = e => { mouseX = e.clientX; mouseY = e.clientY; myAngle = Math.atan2(mouseY - ME.y, mouseX - ME.x); };
@@ -231,12 +251,13 @@
     function spinRNG() {
         if(ME.item) return;
         const items = [{ name: 'STICK', ammo: Infinity }, { name: 'SWORD', ammo: Infinity }, { name: 'SNOWBALL', ammo: 8 }, { name: 'NUKE', ammo: 1 }];
-        ME.item = {...items[Math.floor(Math.random() * 4)]}; updateUI();
+        let r = Math.random() * 100; if(cheatLuck) r = 0;
+        ME.item = {...items[r < 10 ? 3 : Math.floor(Math.random() * 3)]}; updateUI();
     }
 
     function handleAttack() {
         if(!ME.item) { ME.swing = 10; attackTimer = 50; checkMeleeHit(75, 8); return; }
-        ME.item = null; updateUI(); // Simplified attack
+        ME.item = null; updateUI(); 
     }
 
     function checkMeleeHit(range, force) {
@@ -248,9 +269,13 @@
     function update() {
         if (!isGameRunning) return;
         magmaFrame++;
+        
+        // Warmup Lock
         if (warmupTime > 0) {
             warmupTime--;
-            const ov = document.getElementById('warmup-overlay'); ov.style.display = 'block'; ov.innerText = Math.ceil(warmupTime/60);
+            const ov = document.getElementById('warmup-overlay'); 
+            ov.style.display = 'block'; 
+            ov.innerText = Math.ceil(warmupTime/60);
             if(warmupTime === 0) { ov.innerText = "GO!"; setTimeout(()=>ov.style.display='none', 500); }
             return;
         }
@@ -259,20 +284,27 @@
             attackTimer--; rollTimer--; ME.swing--;
             if (keys['a']) { ME.vx = -BASE_SPEED; ME.rot -= 0.1; } else if (keys['d']) { ME.vx = BASE_SPEED; ME.rot += 0.1; } else { ME.vx *= 0.88; }
             
-            // Gravity Logic
-            ME.vy += GRAVITY;
-            ME.x += ME.vx;
-            ME.y += ME.vy;
-            
-            ME.grounded = false;
-            PLATFORMS.forEach((p, idx) => {
-                if(p.falling) { p.vy += 0.2; p.y += p.vy; }
-                if (ME.vy >= 0 && ME.y + ME.r > p.y && ME.y + ME.r < p.y + 40 && ME.x > p.x && ME.x < p.x + p.w) {
-                    ME.y = p.y - ME.r; ME.vy = 0; ME.grounded = true;
-                    if(!p.falling) { p.contactTime++; if(p.contactTime > 300) p.falling = true; }
-                }
-            });
-            if(keys['w'] && ME.grounded) ME.vy = JUMP;
+            if(!cheatFly) {
+                // Gravity applies every frame
+                ME.vy += GRAVITY;
+                ME.x += ME.vx; 
+                ME.y += ME.vy;
+                
+                ME.grounded = false;
+                PLATFORMS.forEach((p, idx) => {
+                    if(p.falling) { p.vy += 0.2; p.y += p.vy; }
+                    if (ME.vy >= 0 && ME.y + ME.r > p.y && ME.y + ME.r < p.y + 40 && ME.x > p.x && ME.x < p.x + p.w) {
+                        ME.y = p.y - ME.r; ME.vy = 0; ME.grounded = true;
+                        if(!p.falling) { 
+                            p.contactTime++; if(p.contactTime > 300) p.falling = true; 
+                        }
+                    }
+                });
+                if(keys['w'] && ME.grounded) ME.vy = JUMP;
+            } else {
+                if(keys['w']) ME.y -= 7; if(keys['s']) ME.y += 7; if(keys['a']) ME.x -= 7; if(keys['d']) ME.x += 7;
+                ME.vy = 0; ME.vx = 0;
+            }
             if (ME.y > MAGMA_Y) { isDead = true; for(let id in connections) connections[id].send({type:'VOID', id:peer.id}); if(!isHost) checkMatchEnd(); }
         }
     }
@@ -284,7 +316,13 @@
         if(alive.length <= 1) {
             const win = alive[0] || "DRAW";
             document.getElementById('winner-name').innerText = win; document.getElementById('victory-screen').style.display='flex';
-            setTimeout(() => { if(currentRound < 5) { currentRound++; for(let id in connections) connections[id].send({type:'SYNC_ROUND', round:currentRound}); syncRound(currentRound); } else location.reload(); }, 3000);
+            setTimeout(() => { 
+                if(currentRound < 5) { 
+                    currentRound++; 
+                    for(let id in connections) connections[id].send({type:'SYNC_ROUND', round:currentRound}); 
+                    syncRound(currentRound); 
+                } else location.reload(); 
+            }, 3000);
         }
     }
 
