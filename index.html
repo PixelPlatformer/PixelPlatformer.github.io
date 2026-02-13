@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Platformer: Collision Update</title>
+    <title>Pixel Platformer: Admin Update</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tiny5&display=swap" rel="stylesheet">
     
@@ -18,7 +18,7 @@
         #gameCanvas { 
             display: none; 
             margin: 0 auto; 
-            background: #87CEEB; /* SKY BLUE GAME BG */
+            background: #87CEEB; /* SKY BLUE */
             border: 4px solid #fff; 
             position: relative; 
             z-index: 10; 
@@ -42,7 +42,6 @@
             text-transform: uppercase; transition: 0.2s; display: block; width: 100%;
         }
         .btn:hover { background: #00d2ff; color: #000; box-shadow: 0 0 15px #00d2ff; }
-        .btn:disabled { border-color: #555; color: #555; cursor: not-allowed; box-shadow: none; }
 
         input { 
             background: #000; color: #fff; border: 2px solid #00d2ff;
@@ -50,22 +49,44 @@
             box-sizing: border-box;
         }
 
-        /* UI LAYERS */
+        /* IN-GAME UI */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; z-index: 20; }
+        
         #scoreboard { position: absolute; top: 20px; right: 20px; text-align: right; }
         .score-entry { font-size: 24px; color: #fff; text-shadow: 2px 2px 0 #000; margin-bottom: 5px; }
+
         #power-display { position: absolute; top: 20px; left: 20px; font-size: 20px; color: #ffff00; text-shadow: 2px 2px 0 #000; }
+
         #rng-box {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
             background: rgba(0,0,0,0.6); border: 2px solid #fff; padding: 10px 30px;
             text-align: center; pointer-events: auto; cursor: pointer;
         }
-        #rare-warning {
-            position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
-            color: #ff00ff; font-size: 20px; text-shadow: 0 0 5px #fff;
-            display: none; animation: flash 0.5s infinite;
+
+        /* ADMIN BUTTON & PANEL */
+        #admin-btn {
+            position: absolute; top: 10px; left: 10px;
+            background: transparent; border: 1px solid #333; color: #333;
+            font-family: 'Tiny5'; cursor: pointer; pointer-events: auto;
+            font-size: 12px; padding: 5px;
         }
-        @keyframes flash { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
+        #admin-btn:hover { border-color: red; color: red; }
+
+        #admin-panel {
+            position: absolute; top: 60px; left: 20px;
+            background: rgba(0,0,0,0.9); border: 2px solid red; padding: 10px;
+            display: none; pointer-events: auto;
+        }
+        .admin-toggle {
+            display: block; margin: 5px 0; color: red; cursor: pointer; font-size: 18px;
+        }
+        .admin-toggle:hover { color: #fff; }
+        .active-cheat { color: #00ff00; }
+        
+        #roll-status {
+            position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+            color: #00d2ff; font-size: 16px; opacity: 0; transition: opacity 0.2s;
+        }
     </style>
 </head>
 <body>
@@ -97,19 +118,29 @@
     </div>
 
     <div id="ui-layer">
+        <button id="admin-btn" onclick="promptAdmin()">ADMIN</button>
+        
+        <div id="admin-panel">
+            <div style="color: red; border-bottom: 1px solid red; margin-bottom: 5px;">ADMIN MENU</div>
+            <div class="admin-toggle" id="cheat-fly" onclick="toggleCheat('fly')">[ ] FLY MODE</div>
+            <div class="admin-toggle" id="cheat-luck" onclick="toggleCheat('luck')">[ ] SUPER LUCK</div>
+            <div class="admin-toggle" id="cheat-freeze" onclick="toggleCheat('freeze')">[ ] FREEZE ALL</div>
+        </div>
+
         <div id="scoreboard">
             <div class="score-entry" id="score-me-display">ME: 0</div>
             <div class="score-entry" style="color: #ff4444;" id="score-enemy-display">OPP: 0</div>
         </div>
         <div id="power-display">POWER: NONE</div>
-        <div id="rare-warning">DON'T REROLL! THIS IS RARE!</div>
+        <div id="roll-status">ROLL COOLDOWN</div>
+        
         <div id="rng-box" onclick="spinRNG()">
             <div style="font-size: 12px; color: #fff;">CLICK FOR ITEM</div>
             <div id="item-display" style="font-size: 24px; color: #fff;">NOTHING</div>
         </div>
     </div>
 
-    <canvas id="gameCanvas" width="1200" height="600"></canvas>
+    <canvas id="gameCanvas" width="1000" height="600"></canvas>
 
 <script>
     // --- 0. MENU PARTICLES ---
@@ -131,14 +162,13 @@
             if (this.y < 0) this.y = bgCanvas.height; if (this.y > bgCanvas.height) this.y = 0;
         }
         draw() {
-            bgCtx.fillStyle = `rgba(0, 210, 255, ${this.alpha})`; // Cyan particles
+            bgCtx.fillStyle = `rgba(0, 210, 255, ${this.alpha})`;
             bgCtx.beginPath(); bgCtx.arc(this.x, this.y, this.size, 0, Math.PI*2); bgCtx.fill();
         }
     }
     for(let i=0; i<50; i++) particles.push(new Particle());
     function animateBg() {
         bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
-        // Fill black background for menu
         bgCtx.fillStyle = '#000'; bgCtx.fillRect(0,0,bgCanvas.width,bgCanvas.height);
         particles.forEach(p => { p.update(); p.draw(); });
         requestAnimationFrame(animateBg);
@@ -149,20 +179,14 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    // MAP DESIGN (PLATFORMS)
-    // x, y, w, h
-    const PLATFORMS = [
-        { x: 100, y: 400, w: 300, h: 50 },  // Left Island
-        { x: 500, y: 350, w: 200, h: 50 },  // Middle Floating
-        { x: 800, y: 400, w: 300, h: 50 },  // Right Island
-        { x: 550, y: 250, w: 100, h: 20 },  // High Perch
-        { x: 200, y: 280, w: 20, h: 120 }   // Wall/Obstacle Left
-    ];
+    // MAP: Single Floating Island
+    const ISLAND_Y = 400; 
+    const ISLAND_X = 200; 
+    const ISLAND_W = 600; 
     
     const GRAVITY = 0.8;
-    const JUMP_FORCE = -14;
+    const JUMP_FORCE = -15; // Standardized Jump
     const BASE_SPEED = 2.5;
-    const BAD_WORDS = ['BAD', 'STUPID', 'HATE', 'KILL', 'UGLY', 'DUMB', 'IDIOT']; 
 
     // STATE
     let myId = null;
@@ -170,20 +194,27 @@
     let conn = null;
     let isHost = false;
     let isGameRunning = false;
+    let canMove = false;
     let projectiles = [];
     let beams = []; 
     let scores = { me: 0, enemy: 0 };
     let mouseX = 0, mouseY = 0, myAngle = 0;
     
-    // PLAYERS
+    // ADMIN CHEATS
+    let isAdmin = false;
+    let cheatFly = false;
+    let cheatLuck = false;
+    let globalFreeze = false;
+
     const ME = { 
-        x: 150, y: 300, w: 40, h: 40, vx: 0, vy: 0, 
+        x: 300, y: 200, w: 40, h: 40, vx: 0, vy: 0, 
         item: 'NOTHING', power: 'NONE', name: 'Guest', 
-        color: '#fff', facingRight: true, meleeCooldown: 0 
+        color: '#fff', facingRight: true, meleeCooldown: 0,
+        rollCooldown: 0
     };
     
     const OTHER = { 
-        x: 900, y: 300, w: 40, h: 40, item: 'NOTHING', 
+        x: 700, y: 200, w: 40, h: 40, item: 'NOTHING', 
         name: 'Enemy', angle: 0, color: '#ff4444' 
     };
 
@@ -195,13 +226,42 @@
         'TANK': { color: '#0000ff', desc: 'Heavy' }
     };
 
-    // --- INPUT ---
-    function cleanName(name) {
-        let clean = name.toUpperCase();
-        BAD_WORDS.forEach(word => { if(clean.includes(word)) clean = clean.replace(word, '***'); });
-        return clean || "PLAYER";
+    // --- ADMIN LOGIC ---
+    function promptAdmin() {
+        const code = prompt("ENTER ADMIN KEY:");
+        if (code === "15542") {
+            isAdmin = true;
+            document.getElementById('admin-panel').style.display = 'block';
+            document.getElementById('admin-btn').style.display = 'none';
+        } else {
+            alert("ACCESS DENIED");
+        }
     }
 
+    function toggleCheat(type) {
+        if (!isAdmin) return;
+        const el = document.getElementById('cheat-' + type);
+        
+        if (type === 'fly') {
+            cheatFly = !cheatFly;
+            el.innerText = cheatFly ? "[X] FLY MODE" : "[ ] FLY MODE";
+            el.className = cheatFly ? "admin-toggle active-cheat" : "admin-toggle";
+            ME.vy = 0; // Stop falling immediately
+        }
+        if (type === 'luck') {
+            cheatLuck = !cheatLuck;
+            el.innerText = cheatLuck ? "[X] SUPER LUCK" : "[ ] SUPER LUCK";
+            el.className = cheatLuck ? "admin-toggle active-cheat" : "admin-toggle";
+        }
+        if (type === 'freeze') {
+            globalFreeze = !globalFreeze;
+            el.innerText = globalFreeze ? "[X] FREEZE ALL" : "[ ] FREEZE ALL";
+            el.className = globalFreeze ? "admin-toggle active-cheat" : "admin-toggle";
+            if(conn) conn.send({ type: 'ADMIN_FREEZE', state: globalFreeze });
+        }
+    }
+
+    // --- INPUT ---
     document.addEventListener('mousemove', e => {
         const rect = canvas.getBoundingClientRect();
         mouseX = e.clientX - rect.left;
@@ -217,7 +277,7 @@
     function generateId() { return Math.random().toString(36).substr(2, 4).toUpperCase(); }
 
     function setupHost() {
-        ME.name = cleanName(document.getElementById('player-name-input').value);
+        ME.name = document.getElementById('player-name-input').value || "HOST";
         showMenu('host-room');
         myId = generateId();
         document.getElementById('host-code').innerText = myId;
@@ -232,7 +292,7 @@
     }
 
     function joinGame() {
-        ME.name = cleanName(document.getElementById('player-name-input').value);
+        ME.name = document.getElementById('player-name-input').value || "GUEST";
         const code = document.getElementById('join-code').value.toUpperCase();
         if(code.length !== 4) return;
         document.getElementById('join-status').innerText = "Connecting...";
@@ -255,7 +315,7 @@
 
     function startGameSequence() {
         document.querySelectorAll('.menu-screen').forEach(el => el.style.display = 'none');
-        document.getElementById('menu-bg-canvas').style.display = 'none'; // Hide menu particles
+        document.getElementById('menu-bg-canvas').style.display = 'none';
         document.getElementById('ui-layer').style.display = 'block';
         canvas.style.display = 'block';
         
@@ -268,15 +328,14 @@
         
         respawn();
         isGameRunning = true;
+        canMove = true;
         gameLoop(); 
         setInterval(sendData, 20);
     }
 
     function respawn() {
-        // Find a random platform to spawn on
-        const plat = PLATFORMS[Math.floor(Math.random() * 3)]; // Pick one of the first 3
-        ME.x = plat.x + 20;
-        ME.y = plat.y - 100;
+        ME.x = ISLAND_X + Math.random() * (ISLAND_W - 50);
+        ME.y = ISLAND_Y - 200;
         ME.vx = 0; ME.vy = 0;
     }
 
@@ -310,6 +369,10 @@
             if (data.type === 'DEATH') { scores.me++; updateScore(); }
             if (data.type === 'PROJ') projectiles.push(data.obj);
             if (data.type === 'BEAM') beams.push(data.obj);
+            
+            if (data.type === 'ADMIN_FREEZE') {
+                globalFreeze = data.state;
+            }
         });
     }
 
@@ -323,6 +386,9 @@
     function update() {
         if (!isGameRunning) return;
 
+        // FREEZE CHECK
+        if (globalFreeze && !isAdmin) return;
+
         // PLAYER MOVEMENT
         let spd = BASE_SPEED;
         if (ME.power === 'FAST') spd *= 1.5;
@@ -332,65 +398,71 @@
         else if (keys['d']) ME.vx = spd;
         else ME.vx *= 0.8; 
 
-        if (keys['w'] && onGround(ME)) ME.vy = JUMP_FORCE;
-
-        ME.vy += GRAVITY; ME.x += ME.vx; ME.y += ME.vy;
-
-        // PLATFORM COLLISION
-        let grounded = false;
-        for (let p of PLATFORMS) {
-            // Check Landing (only if falling downwards)
-            if (ME.vy >= 0 && 
-                ME.y + ME.h >= p.y && ME.y + ME.h <= p.y + p.h && // Vertically aligned top
-                ME.x + ME.w > p.x && ME.x < p.x + p.w) { // Horizontally aligned
-                
-                // Ensure we were previously above it (prevents snapping from side)
-                if (ME.y + ME.h - ME.vy <= p.y + 5) {
-                    ME.y = p.y - ME.h;
-                    ME.vy = 0;
-                    grounded = true;
-                }
-            }
-            
-            // Wall Collision (Optional - for simple obstacles)
-            // Just checks overlap
-             if (ME.x < p.x + p.w && ME.x + ME.w > p.x && ME.y < p.y + p.h && ME.y + ME.h > p.y) {
-                 // Simple push out - not strictly necessary for "holes", but good for walls
-                 // (Simplified for this version to focus on hole mechanics)
-             }
+        // ADMIN FLY MODE
+        if (cheatFly) {
+            if (keys['w']) ME.vy = -spd;
+            else if (keys['s']) ME.vy = spd;
+            else ME.vy = 0;
+        } else {
+            // Normal Physics
+            if (keys['w'] && onGround(ME)) ME.vy = JUMP_FORCE;
+            ME.vy += GRAVITY; 
         }
 
-        // VOID DEATH (HOLES)
+        // ROLL LOGIC
+        if (ME.rollCooldown > 0) {
+            ME.rollCooldown--;
+            document.getElementById('roll-status').style.opacity = '1';
+        } else {
+            document.getElementById('roll-status').style.opacity = '0';
+        }
+
+        if (keys['shift'] && ME.rollCooldown <= 0 && !cheatFly) {
+            const dir = ME.facingRight ? 1 : -1;
+            ME.vx = dir * 10; // Boost
+            ME.rollCooldown = 90; // 1.5s Cooldown (60 frames/s approx)
+        }
+
+        ME.x += ME.vx; 
+        ME.y += ME.vy;
+        
+        // Direction calc
+        if (mouseX > ME.x) ME.facingRight = true;
+        else ME.facingRight = false;
+
+        // ISLAND COLLISION (Simple Rect)
+        // If falling, and within X bounds of island, and at Y height
+        if (ME.vy >= 0 && !cheatFly) {
+            if (ME.y + ME.h >= ISLAND_Y && ME.y + ME.h <= ISLAND_Y + 30) {
+                if (ME.x + ME.w > ISLAND_X && ME.x < ISLAND_X + ISLAND_W) {
+                    ME.y = ISLAND_Y - ME.h;
+                    ME.vy = 0;
+                }
+            }
+        }
+
+        // VOID DEATH
         if (ME.y > canvas.height + 200) {
             respawn(); scores.enemy++; updateScore();
             if(conn) conn.send({type: 'DEATH'});
         }
 
-        // --- MELEE COLLISION LOGIC (Run-Into-To-Hit) ---
+        // --- MELEE COLLISION (Run Into Enemy) ---
         if (ME.meleeCooldown > 0) ME.meleeCooldown--;
-
         const isMelee = (ME.item === 'NOTHING' || ME.item === 'SWORD' || ME.item === 'STICK');
+        
         if (isMelee && ME.meleeCooldown <= 0) {
-            // Check Overlap with Enemy
             if (checkRectOverlap(ME.x, ME.y, ME.w, ME.h, OTHER)) {
-                // Check Aim (Are we looking at them?)
-                const dx = OTHER.x - ME.x;
-                const dy = OTHER.y - ME.y;
+                // Check if aiming at them
+                const dx = OTHER.x - ME.x; const dy = OTHER.y - ME.y;
                 const angleToEnemy = Math.atan2(dy, dx);
-                const angleDiff = Math.abs(myAngle - angleToEnemy);
-                
-                // If aiming reasonably close to them (within ~60 degrees)
-                if (Math.abs(angleDiff) < 1.0) {
-                    // APPLY HIT
+                if (Math.abs(myAngle - angleToEnemy) < 1.0) {
                     let force = 10;
                     if (ME.item === 'SWORD') force = 25;
                     if (ME.item === 'STICK') force = 15;
                     if (ME.power === 'STRONG') force *= 1.5;
-
-                    const knockX = Math.cos(myAngle) * force;
-                    
-                    sendHit(force, knockX, -5);
-                    ME.meleeCooldown = 30; // 0.5s Cooldown
+                    sendHit(force, Math.cos(myAngle)*force, -5);
+                    ME.meleeCooldown = 30;
                 }
             }
         }
@@ -412,10 +484,9 @@
             b.life--;
             if (b.owner !== 'ME') {
                 const dx = ME.x - b.sx; const dy = ME.y - b.sy;
-                const angleToMe = Math.atan2(dy, dx);
-                const angleDiff = Math.abs(b.angle - angleToMe);
                 const dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist < 1200 && angleDiff < 0.1) {
+                const angleToMe = Math.atan2(dy, dx);
+                if (dist < 1200 && Math.abs(b.angle - angleToMe) < 0.1) {
                     applyHit(ME, 2, Math.cos(b.angle)*2, Math.sin(b.angle)*2);
                 }
             }
@@ -424,25 +495,16 @@
     }
 
     function onGround(p) {
-        for (let plat of PLATFORMS) {
-            if (p.y + p.h === plat.y && p.x + p.w > plat.x && p.x < plat.x + plat.w) return true;
-        }
-        return false;
+        return (p.y + p.h === ISLAND_Y && p.x + p.w > ISLAND_X && p.x < ISLAND_X + ISLAND_W);
     }
 
     // --- DRAW ---
     function draw() {
         ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // PLATFORMS
-        ctx.fillStyle = '#4caf50'; // Grass Color
-        for(let p of PLATFORMS) {
-            ctx.fillRect(p.x, p.y, p.w, p.h);
-            // Optional: Draw dirt below grass
-            ctx.fillStyle = 'rgba(0,0,0,0.2)';
-            ctx.fillRect(p.x, p.y + 10, p.w, p.h - 10);
-            ctx.fillStyle = '#4caf50'; // Reset for next
-        }
+        // ISLAND
+        ctx.fillStyle = '#4caf50'; ctx.fillRect(ISLAND_X, ISLAND_Y, ISLAND_W, 20);
+        ctx.fillStyle = '#5d4037'; ctx.fillRect(ISLAND_X + 10, ISLAND_Y + 20, ISLAND_W - 20, 50);
 
         // Projectiles
         projectiles.forEach(p => {
@@ -468,133 +530,17 @@
 
         ctx.fillStyle = color; ctx.fillRect(p.x, p.y, p.w, p.h);
 
-        // FLOATING HAND
+        // HAND
         ctx.save();
         ctx.translate(p.x + p.w/2, p.y + p.h/2);
         let angle = isMe ? myAngle : p.angle;
         
         const handDist = 35;
-        const handX = Math.cos(angle) * handDist;
-        const handY = Math.sin(angle) * handDist;
-        
-        if (!isMe) {
-            ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)'; ctx.setLineDash([5, 5]); ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(angle)*200, Math.sin(angle)*200); ctx.stroke();
-            ctx.setLineDash([]);
-        }
-
-        ctx.translate(handX, handY);
+        ctx.translate(Math.cos(angle)*handDist, Math.sin(angle)*handDist);
         ctx.rotate(angle);
         
-        ctx.fillStyle = color; 
-        ctx.fillRect(-6, -6, 12, 12); // The Hand
+        ctx.fillStyle = color; ctx.fillRect(-6, -6, 12, 12);
         
         if (p.item === 'SWORD') {
             ctx.fillStyle = '#ccc'; ctx.fillRect(0, -2, 40, 4);
-            ctx.fillStyle = '#8B4513'; ctx.fillRect(-5, -2, 10, 4);
-        } else if (p.item === 'STICK') {
-            ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 3; 
-            ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(30,0); ctx.stroke();
-        } else if (p.item === 'SNOWBALL') {
-            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(5, 0, 6, 0, Math.PI*2); ctx.fill();
-        } else if (p.item === 'NUKE') {
-            ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(5, 0, 8, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#ff0'; ctx.font = '10px Arial'; ctx.fillText('☢', 5, 3);
-        } else if (p.item === 'TELEPORTER') {
-            ctx.fillStyle = '#0ff'; ctx.fillRect(0, -5, 15, 10);
-        } else if (p.item === 'LASER') {
-            ctx.fillStyle = '#f00'; ctx.fillRect(0, -4, 20, 8);
-        }
-        ctx.restore();
-    }
-
-    // --- INPUT (RANGED ONLY) ---
-    const keys = {};
-    window.addEventListener('keydown', e => {
-        keys[e.key.toLowerCase()] = true;
-        // Spacebar ONLY triggers ranged items now
-        if (e.key === ' ' && canMove) useRangedItem(); 
-        if (e.key === 'e') spinRNG();
-    });
-    window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-
-    function useRangedItem() {
-        // Melee items are handled in Update Loop (Collision)
-        if (ME.item === 'NOTHING' || ME.item === 'SWORD' || ME.item === 'STICK') return;
-
-        const vx = Math.cos(myAngle);
-        const vy = Math.sin(myAngle);
-
-        if (ME.item === 'SNOWBALL' || ME.item === 'NUKE') {
-            const isNuke = ME.item === 'NUKE';
-            const spd = isNuke ? 8 : 12;
-            const size = isNuke ? 20 : 10;
-            const color = isNuke ? '#000' : '#fff';
-            
-            const p = { x: ME.x+20, y: ME.y+20, vx: vx*spd, vy: vy*spd, owner: 'ME', type: isNuke?'NUKE':'SNOWBALL', size: size, color: color };
-            projectiles.push(p);
-            if(conn) conn.send({type: 'PROJ', obj: Object.assign({}, p, {owner:'OTHER'}) });
-            ME.item = 'NOTHING'; updateUI();
-        }
-        else if (ME.item === 'TELEPORTER') {
-            if(conn) conn.send({ type: 'TELEPORT_OUT' });
-            ME.item = 'NOTHING'; updateUI();
-        }
-        else if (ME.item === 'LASER') {
-            const b = { sx: ME.x+20, sy: ME.y+20, angle: myAngle, life: 60, owner: 'ME' };
-            beams.push(b);
-            if(conn) conn.send({type: 'BEAM', obj: Object.assign({}, b, {owner:'OTHER'})});
-            ME.item = 'NOTHING'; updateUI();
-        }
-    }
-
-    function checkRectOverlap(x, y, w, h, target) {
-        return (x < target.x + target.w && x + w > target.x && y < target.y + target.h && y + h > target.y);
-    }
-
-    function sendHit(force, vx, vy) { if(conn) conn.send({ type: 'HIT', force: force, vx: vx, vy: vy }); }
-    function applyHit(p, force, vx, vy) { p.vx = vx; p.vy = vy; }
-
-    // --- RNG ---
-    function spinRNG() {
-        let items = ['SWORD', 'STICK', 'SNOWBALL'];
-        let i = 0;
-        let t = setInterval(() => {
-            document.getElementById('item-display').innerText = items[i % items.length];
-            i++;
-            if(i>10) {
-                clearInterval(t);
-                const r = Math.random() * 1000;
-                let newItem = 'NOTHING';
-                if (r <= 1) newItem = 'LASER';
-                else if (r <= 3) newItem = 'TELEPORTER';
-                else if (r <= 13) newItem = 'NUKE';
-                else {
-                    const c = Math.random();
-                    if(c < 0.4) newItem = 'STICK';
-                    else if (c < 0.7) newItem = 'SNOWBALL';
-                    else newItem = 'SWORD';
-                }
-                ME.item = newItem;
-                updateUI();
-            }
-        }, 50);
-    }
-    
-    function updateUI() { 
-        document.getElementById('item-display').innerText = ME.item;
-        const isRare = ['NUKE', 'TELEPORTER', 'LASER'].includes(ME.item);
-        document.getElementById('rare-warning').style.display = isRare ? 'block' : 'none';
-        document.getElementById('item-display').style.color = isRare ? '#ff00ff' : '#fff';
-    }
-
-    function updateScore() { 
-        document.getElementById('score-me-display').innerText = ME.name + ": " + scores.me; 
-        document.getElementById('score-enemy-display').innerText = OTHER.name + ": " + scores.enemy; 
-    }
-
-    function gameLoop() { if(isGameRunning) { update(); draw(); requestAnimationFrame(gameLoop); } }
-
-</script>
-</body>
-</html>
+            ctx.fillStyle = '#8B4513'; ctx.fillRect(-5, -2,
