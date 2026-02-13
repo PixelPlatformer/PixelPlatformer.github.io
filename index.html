@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Platformer: Textured Chaos</title>
+    <title>Pixel Platformer: Parkour Chaos</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tiny5&display=swap" rel="stylesheet">
     <style>
@@ -14,7 +14,7 @@
         .menu-screen { 
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             text-align: center; display: none; z-index: 100; min-width: 400px;
-            background: rgba(0,0,0,0.95); padding: 30px; border: 4px solid #00d2ff;
+            background: rgba(0,0,0,0.95); padding: 30px; border: 2px solid #00d2ff;
         }
         #main-menu { display: block; }
         .btn { background: #000; color: #fff; border: 2px solid #00d2ff; padding: 12px 20px; font-family: 'Tiny5'; font-size: 20px; cursor: pointer; margin: 8px 0; text-transform: uppercase; width: 100%; }
@@ -24,46 +24,63 @@
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; z-index: 20; }
         #match-timer { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 40px; color: #fff; text-shadow: 2px 2px #000; }
         #scoreboard { position: absolute; top: 20px; right: 20px; text-align: right; }
+        #power-display { position: absolute; top: 20px; left: 20px; font-size: 20px; color: #ffff00; }
         
         #inventory-ui { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
-        .inv-slot { width: 70px; height: 70px; background: rgba(0,0,0,0.8); border: 3px solid #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; }
-        .inv-active { border-color: #ffff00; }
+        .inv-slot { width: 75px; height: 75px; background: rgba(0,0,0,0.8); border: 3px solid #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; }
+        .inv-active { border-color: #ffff00; box-shadow: 0 0 10px #ffff00; }
         
         #pickup-prompt { position: absolute; bottom: 190px; left: 50%; transform: translateX(-50%); color: #ffff00; font-size: 20px; display: none; }
         #rng-box { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); border: 2px solid #fff; padding: 10px 30px; pointer-events: auto; cursor: pointer; }
+        
+        #admin-panel { position: absolute; top: 60px; left: 20px; background: rgba(0,0,0,0.9); border: 1px solid red; padding: 10px; pointer-events: auto; display: none; }
+        #rare-warning { position: absolute; bottom: 85px; left: 50%; transform: translateX(-50%); color: #ff00ff; animation: flash 0.5s infinite; display: none; font-size: 18px; }
+        @keyframes flash { 0% { opacity: 1; } 50% { opacity: 0; } }
     </style>
 </head>
 <body>
     <canvas id="bg-canvas"></canvas>
+    
     <div id="main-menu" class="menu-screen">
         <h1 style="font-size: 50px; color: #00d2ff;">PIXEL PLATFORMER</h1>
         <input type="text" id="player-name-input" placeholder="ENTER NAME" maxlength="10">
         <button class="btn" onclick="setupHost()">HOST GAME</button>
         <button class="btn" onclick="showMenu('join-menu')">JOIN GAME</button>
     </div>
+
     <div id="join-menu" class="menu-screen">
         <h2>JOIN GAME</h2>
         <input type="text" id="join-code-input" placeholder="4-LETTER CODE">
         <button class="btn" onclick="joinGame()">CONNECT</button>
         <button class="btn" onclick="showMenu('main-menu')">BACK</button>
     </div>
+
     <div id="host-lobby" class="menu-screen">
         <h2>LOBBY: <span id="host-code-display" style="color: #00ffff;">...</span></h2>
-        <div id="opponent-entry">Waiting for player...</div>
+        <div id="opponent-entry" style="margin: 20px 0;">Waiting for player...</div>
         <button class="btn" onclick="triggerStart()" id="start-btn" disabled>START MATCH</button>
+        <button class="btn" onclick="location.reload()">CANCEL</button>
     </div>
 
     <div id="ui-layer">
         <div id="match-timer">03:00</div>
+        <div id="admin-panel">
+            <div style="color:red; margin-bottom:5px;">ADMIN PANEL</div>
+            <button class="btn" onclick="toggleCheat('fly')">FLY</button>
+            <button class="btn" onclick="toggleCheat('luck')">LUCK</button>
+        </div>
         <div id="scoreboard"><div id="score-me-display">ME: 0</div><div id="score-enemy-display" style="color: #ff4444;">OPP: 0</div></div>
+        <div id="power-display">POWER: NONE</div>
+        <div id="rare-warning">RARE! DON'T REROLL!</div>
         <div id="pickup-prompt">PRESS 'R' TO PICK UP <span id="item-name"></span></div>
         <div id="inventory-ui">
             <div class="inv-slot inv-active" id="slot-0">EMPTY</div>
             <div class="inv-slot" id="slot-1">EMPTY</div>
             <div class="inv-slot" id="slot-2">EMPTY</div>
         </div>
-        <div id="rng-box" onclick="spinRNG()"><div>CLICK FOR ITEM</div><div id="item-display">NOTHING</div></div>
+        <div id="rng-box" onclick="spinRNG()"><div>CLICK FOR ITEM</div><div id="item-display" style="font-size: 24px;">NOTHING</div></div>
     </div>
+
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -72,19 +89,25 @@
     const bgCanvas = document.getElementById('bg-canvas');
     const bgCtx = bgCanvas.getContext('2d');
 
-    // BIG MAP DESIGN
+    // --- PARKOUR MAP DESIGN ---
     const PLATFORMS = [
-        { x: 100, y: 500, w: 400, h: 80 }, 
-        { x: 600, y: 350, w: 300, h: 80 }, 
-        { x: 1000, y: 450, w: 400, h: 80 }, 
-        { x: 400, y: 150, w: 250, h: 40 }
+        { x: 100, y: 500, w: 250, h: 80 },  // Spawn A
+        { x: 450, y: 420, w: 150, h: 40 },  // Mid Low
+        { x: 700, y: 340, w: 200, h: 40 },  // Mid High
+        { x: 1000, y: 480, w: 250, h: 80 }, // Spawn B
+        { x: 550, y: 200, w: 100, h: 30 },  // Top Perch
+        { x: 250, y: 300, w: 100, h: 30 }   // Side Jump
     ];
-    const LAVA_Y = 580;
+    const LAVA_Y = 650; // Kept at bottom
+    const GRAVITY = 0.55;
+    const JUMP = -13;
+    const BASE_SPEED = 1.5;
 
     let isGameRunning = false, isHost = false, conn, peer, myId;
     let mouseX = 0, mouseY = 0, myAngle = 0;
     let projectiles = [], explosions = [], beams = [], droppedItems = [], scores = { me: 0, enemy: 0 };
-    let rollTimer = 0, attackTimer = 0, matchTime = 180, lavaFrame = 0;
+    let cheatFly = false, cheatLuck = false, rollTimer = 0, attackTimer = 0, reloadTimer = 0, matchTime = 180, lavaFrame = 0;
+    let selectedSlot = 0; // Current slot index
 
     const ME = { x: 0, y: 0, r: 20, vx: 0, vy: 0, rot: 0, inventory: [], name: 'ME', color: '#fff', swing: 0, power: 'NONE' };
     const OTHER = { x: 0, y: 0, r: 20, rot: 0, item: 'NOTHING', name: 'OPP', angle: 0, color: '#ff4444', swing: 0 };
@@ -93,14 +116,19 @@
     window.addEventListener('resize', resize); resize();
     function randColor() { return `hsl(${Math.random() * 360}, 80%, 60%)`; }
 
-    // --- NETWORKING ---
+    // --- MULTIPLAYER ---
     function setupHost() {
         ME.name = document.getElementById('player-name-input').value || "HOST";
         myId = Math.random().toString(36).substr(2, 4).toUpperCase();
         document.getElementById('host-code-display').innerText = myId;
         showMenu('host-lobby');
         peer = new Peer(myId);
-        peer.on('connection', c => { conn = c; document.getElementById('opponent-entry').innerText = "PLAYER JOINED!"; document.getElementById('start-btn').disabled = false; initConn(); });
+        peer.on('connection', c => {
+            conn = c;
+            document.getElementById('opponent-entry').innerText = "PLAYER JOINED!";
+            document.getElementById('start-btn').disabled = false;
+            initConn();
+        });
         isHost = true;
     }
 
@@ -123,7 +151,7 @@
             if (data.type === 'DROP') droppedItems.push(data.obj);
             if (data.type === 'PICKED') droppedItems = droppedItems.filter(i => i.id !== data.id);
             if (data.type === 'PROJ') projectiles.push(data.obj);
-            if (data.type === 'EXPLODE') explosions.push({ x: data.x, y: data.y, r: 0, max: 150 });
+            if (data.type === 'EXPLODE') explosions.push({ x: data.x, y: data.y, r: 0, max: 200 });
             if (data.type === 'BEAM') beams.push(data.obj);
             if (data.type === 'TIME') matchTime = data.val;
         });
@@ -136,161 +164,236 @@
         document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none');
         document.getElementById('ui-layer').style.display = 'block';
         canvas.style.display = 'block';
-        isGameRunning = true; ME.color = randColor();
-        ME.x = isHost ? 200 : 1200; ME.y = 100;
+        isGameRunning = true; 
+        ME.color = randColor();
+        ME.x = isHost ? 200 : 1000; ME.y = 100;
+        const p = ['SPEED', 'JUMP', 'STRONG'];
+        ME.power = p[Math.floor(Math.random()*p.length)];
+        document.getElementById('power-display').innerText = "POWER: " + ME.power;
+        
         requestAnimationFrame(gameLoop);
         if(isHost) setInterval(() => { matchTime--; if(conn) conn.send({type:'TIME', val:matchTime}); }, 1000);
         setInterval(() => {
-            if (conn && conn.open) conn.send({ x: ME.x, y: ME.y, rot: ME.rot, item: ME.inventory[0]?.name || 'NOTHING', angle: myAngle, name: ME.name, color: ME.color, swing: ME.swing });
+            if (conn && conn.open) conn.send({ x: ME.x, y: ME.y, rot: ME.rot, item: ME.inventory[selectedSlot]?.name || 'NOTHING', angle: myAngle, name: ME.name, color: ME.color, swing: ME.swing });
         }, 20);
     }
 
-    // --- CONTROLS ---
+    // --- INPUT & COMBAT ---
     window.onkeydown = e => { 
-        if(e.key === ' ' && attackTimer <= 0) handleAttack();
+        if(e.key === ' ' && attackTimer <= 0 && reloadTimer <= 0) handleAttack();
         if(e.key === 'e') spinRNG();
+        if(e.key === 'q') cycleSlots(); // Cycle Items
         if(e.key === 'Backspace') dropItem();
         if(e.key === 'r') tryPickUp();
         if(e.key === 'Shift' && rollTimer <= 0) roll();
+        if(e.key === '/') { const p = prompt("ADMIN?"); if(p === '15542') document.getElementById('admin-panel').style.display='block'; }
         keys[e.key.toLowerCase()] = true; 
     };
     const keys = {};
     window.onkeyup = e => keys[e.key.toLowerCase()] = false;
-    window.onmousemove = e => { mouseX = e.clientX; mouseY = e.clientY; myAngle = Math.atan2(mouseY - ME.y, mouseX - ME.x); };
+    window.onmousemove = e => {
+        mouseX = e.clientX; mouseY = e.clientY;
+        myAngle = Math.atan2(mouseY - ME.y, mouseX - ME.x);
+    };
+
+    function cycleSlots() {
+        selectedSlot = (selectedSlot + 1) % 3;
+        updateUI();
+    }
 
     function spinRNG() {
         if(ME.inventory.length >= 3) return;
         const items = [{ name: 'STICK', ammo: Infinity }, { name: 'SWORD', ammo: Infinity }, { name: 'SNOWBALL', ammo: 8 }, { name: 'NUKE', ammo: 1 }, { name: 'LASER', ammo: 3600 }];
         let res = items[Math.floor(Math.random() * 3)];
-        if (Math.random() < 0.1) res = items[3];
-        if (Math.random() < 0.05) res = items[4];
+        let r = Math.random() * 100;
+        if(cheatLuck) r = 0;
+        if(r < 10) res = items[3]; 
+        if(r < 2) res = items[4]; 
         ME.inventory.push({...res});
         updateUI();
     }
 
     function handleAttack() {
-        const item = ME.inventory[0] || { name: 'FIST', ammo: Infinity };
+        const item = ME.inventory[selectedSlot];
+        if(!item) return;
         const vx = Math.cos(myAngle), vy = Math.sin(myAngle);
 
-        if (item.name === 'FIST') { ME.swing = 10; attackTimer = 60; checkMeleeHit(60, 8); } 
-        else if (item.name === 'STICK') { ME.swing = 15; attackTimer = 90; checkMeleeHit(80, 15); } 
-        else if (item.name === 'SWORD') { ME.swing = 20; attackTimer = 90; checkMeleeHit(120, 20); } 
+        if (item.name === 'STICK') { ME.swing = 15; attackTimer = 90; checkMeleeHit(85, 18); } 
+        else if (item.name === 'SWORD') { ME.swing = 20; attackTimer = 90; checkMeleeHit(130, 22); } 
         else if (item.name === 'SNOWBALL') {
-            projectiles.push({ x: ME.x, y: ME.y, vx: vx * 12, vy: vy * 12, owner: 'ME', type: 'SNOW' });
-            if(conn) conn.send({ type: 'PROJ', obj: { x: ME.x, y: ME.y, vx: vx * 12, vy: vy * 12, owner: 'OTHER', type: 'SNOW' } });
-            item.ammo--; attackTimer = 120;
+            const obj = { x: ME.x, y: ME.y, vx: vx * 12, vy: vy * 12, owner: 'ME', type: 'SNOW' };
+            projectiles.push(obj);
+            if(conn) conn.send({ type: 'PROJ', obj: { ...obj, owner: 'OTHER' } });
+            item.ammo--; reloadTimer = 120; 
         } else if (item.name === 'NUKE') {
-            projectiles.push({ x: ME.x, y: ME.y, vx: vx * 5, vy: vy * 5, owner: 'ME', type: 'NUKE' });
-            if(conn) conn.send({ type: 'PROJ', obj: { x: ME.x, y: ME.y, vx: vx * 5, vy: vy * 5, owner: 'OTHER', type: 'NUKE' } });
+            const obj = { x: ME.x, y: ME.y, vx: vx * 6, vy: vy * 4, owner: 'ME', type: 'NUKE' };
+            projectiles.push(obj);
+            if(conn) conn.send({ type: 'PROJ', obj: { ...obj, owner: 'OTHER' } });
             item.ammo--;
         } else if (item.name === 'LASER') {
-            beams.push({ sx: ME.x, sy: ME.y, angle: myAngle, owner: 'ME', life: 60 });
+            const obj = { sx: ME.x, sy: ME.y, angle: myAngle, owner: 'ME', life: 60 };
+            beams.push(obj);
             if(conn) conn.send({ type: 'BEAM', obj: { sx: ME.x, sy: ME.y, angle: myAngle, owner: 'OTHER', life: 60 } });
             item.ammo -= 60;
         }
-        if (item.ammo <= 0) ME.inventory.shift();
+
+        if (item.ammo <= 0) ME.inventory.splice(selectedSlot, 1);
         updateUI();
     }
 
     function checkMeleeHit(range, force) {
         const d = Math.hypot(OTHER.x - ME.x, OTHER.y - ME.y);
         const ang = Math.atan2(OTHER.y - ME.y, OTHER.x - ME.x);
-        if (d < range && Math.abs(myAngle - ang) < 1) {
-            if(conn) conn.send({ type: 'HIT', vx: Math.cos(myAngle) * force, vy: -5 });
+        if (d < range && Math.abs(myAngle - ang) < 1.1) {
+            let f = force; if(ME.power === 'STRONG') f *= 1.6;
+            if(conn) conn.send({ type: 'HIT', vx: Math.cos(myAngle) * f, vy: -6 });
         }
     }
 
-    function dropItem() { if(ME.inventory.length === 0) return; const item = ME.inventory.shift(); const obj = { id: Math.random(), ...item, x: ME.x, y: ME.y, timer: 600 }; droppedItems.push(obj); if(conn) conn.send({ type: 'DROP', obj }); updateUI(); }
-    function tryPickUp() {
-        const idx = droppedItems.findIndex(i => Math.hypot(i.x - ME.x, i.y - ME.y) < 50);
-        if(idx > -1 && ME.inventory.length < 3) { const item = droppedItems[idx]; ME.inventory.push({name: item.name, ammo: item.ammo}); droppedItems.splice(idx, 1); if(conn) conn.send({ type: 'PICKED', id: item.id }); updateUI(); }
+    function dropItem() {
+        if(!ME.inventory[selectedSlot]) return;
+        const item = ME.inventory.splice(selectedSlot, 1)[0];
+        const obj = { id: Math.random(), ...item, x: ME.x, y: ME.y, timer: 600 };
+        droppedItems.push(obj);
+        if(conn) conn.send({ type: 'DROP', obj });
+        updateUI();
     }
-    function roll() { ME.vx = (mouseX > ME.x ? 1 : -1) * 15; rollTimer = 120; }
 
-    // --- GAME ENGINE ---
+    function tryPickUp() {
+        const idx = droppedItems.findIndex(i => Math.hypot(i.x - ME.x, i.y - ME.y) < 60);
+        if(idx > -1 && ME.inventory.length < 3) {
+            const item = droppedItems[idx]; ME.inventory.push({name: item.name, ammo: item.ammo});
+            droppedItems.splice(idx, 1); if(conn) conn.send({ type: 'PICKED', id: item.id });
+            updateUI();
+        }
+    }
+
+    function roll() { ME.vx = (mouseX > ME.x ? 1 : -1) * 16; rollTimer = 120; } 
+
     function update() {
         if (!isGameRunning) return;
-        if (attackTimer > 0) attackTimer--; if (rollTimer > 0) rollTimer--; if (ME.swing > 0) ME.swing--; lavaFrame++;
+        if (attackTimer > 0) attackTimer--; if (rollTimer > 0) rollTimer--; 
+        if (reloadTimer > 0) reloadTimer--; if (ME.swing > 0) ME.swing--; lavaFrame++;
 
-        if (keys['a']) { ME.vx = -3; ME.rot -= 0.1; } else if (keys['d']) { ME.vx = 3; ME.rot += 0.1; } else { ME.vx *= 0.9; }
-        ME.vy += 0.6; ME.x += ME.vx; ME.y += ME.vy;
+        let spd = BASE_SPEED; if(ME.power === 'SPEED') spd = 3.2;
+        if (keys['a']) { ME.vx = -spd; ME.rot -= 0.1; } else if (keys['d']) { ME.vx = spd; ME.rot += 0.1; } else { ME.vx *= 0.85; }
+
+        if(!cheatFly) {
+            let jmp = JUMP; if(ME.power === 'JUMP') jmp = -16;
+            if(keys['w'] && ME.grounded) ME.vy = jmp;
+            ME.vy += GRAVITY;
+        } else {
+            if(keys['w']) ME.vy = -5; else if(keys['s']) ME.vy = 5; else ME.vy = 0;
+        }
+
+        ME.x += ME.vx; ME.y += ME.vy;
         ME.grounded = false;
         PLATFORMS.forEach(p => { if (ME.vy >= 0 && ME.y + ME.r > p.y && ME.y + ME.r < p.y + p.h && ME.x > p.x && ME.x < p.x + p.w) { ME.y = p.y - ME.r; ME.vy = 0; ME.grounded = true; } });
-        if (keys['w'] && ME.grounded) ME.vy = -12;
 
         droppedItems.forEach((item, i) => { item.timer--; if(item.timer <= 0) droppedItems.splice(i, 1); });
-        if (ME.y > LAVA_Y) { ME.x = 200; ME.y = 100; ME.vx = 0; ME.vy = 0; scores.enemy++; updateUI(); ME.color = randColor(); if(conn) conn.send({type: 'POINT'}); }
+
+        if (ME.y > LAVA_Y) { 
+            ME.x = 200; ME.y = 100; ME.vx = 0; ME.vy = 0; scores.enemy++; updateUI(); ME.color = randColor();
+            if(conn) conn.send({type: 'POINT'});
+        }
         
         projectiles.forEach((p, i) => {
-            p.x += p.vx; p.y += p.vy; if(p.type==='NUKE') p.vy+=0.1;
-            if (Math.hypot(p.x - ME.x, p.y - ME.y) < 30 && p.owner === 'OTHER') { ME.vx = p.vx; ME.vy = -10; projectiles.splice(i, 1); }
-            if (p.y > LAVA_Y) {
-                if(p.type==='NUKE'){ explosions.push({x:p.x, y:p.y, r:0, max:150}); if(conn) conn.send({type:'EXPLODE', x:p.x, y:p.y}); }
-                projectiles.splice(i,1);
-            }
+            p.x += p.vx; p.y += p.vy; if(p.type==='NUKE') p.vy+=0.15;
+            if (Math.hypot(p.x - ME.x, p.y - ME.y) < 30 && p.owner === 'OTHER') { ME.vx = p.vx; ME.vy = -8; projectiles.splice(i, 1); }
+            PLATFORMS.forEach(plat => {
+                if(p.type==='NUKE' && p.y > plat.y && p.x > plat.x && p.x < plat.x + plat.w) {
+                    explosions.push({x:p.x, y:p.y, r:0, max:220});
+                    if(conn) conn.send({type:'EXPLODE', x:p.x, y:p.y});
+                    projectiles.splice(i,1);
+                }
+            });
+            if (p.y > 1500) projectiles.splice(i,1);
         });
-        explosions.forEach((e, i) => { e.r += 10; if (Math.hypot(ME.x - e.x, ME.y - e.y) < e.r && e.r < 50) { ME.vx = (ME.x - e.x) * 0.5; ME.vy = -20; } if (e.r > e.max) explosions.splice(i, 1); });
-        beams.forEach((b, i) => { b.life--; if(b.owner==='OTHER' && Math.abs(b.angle - Math.atan2(ME.y - b.sy, ME.x - b.sx)) < 0.1) ME.vx += Math.cos(b.angle)*2; if(b.life <= 0) beams.splice(i, 1); });
+
+        explosions.forEach((e, i) => { 
+            e.r += 12; 
+            if (Math.hypot(ME.x - e.x, ME.y - e.y) < e.r && e.r < 60) { ME.vx = (ME.x - e.x) * 0.6; ME.vy = -20; } 
+            if (e.r > e.max) explosions.splice(i, 1); 
+        });
+
+        beams.forEach((b, i) => { 
+            b.life--; 
+            if(b.owner==='OTHER') {
+                const ang = Math.atan2(ME.y - b.sy, ME.x - b.sx);
+                if(Math.abs(b.angle - ang) < 0.12) { ME.vx += Math.cos(b.angle)*2.5; ME.vy -= 0.2; }
+            }
+            if(b.life <= 0) beams.splice(i, 1); 
+        });
     }
 
     function drawPlayer(p, color, isMe) {
         ctx.save(); ctx.translate(p.x, p.y);
-        ctx.fillStyle="#fff"; ctx.font="12px Arial"; ctx.textAlign="center"; ctx.fillText(p.name, 0, -35);
-        // BLACK OUTLINE
+        ctx.fillStyle="#fff"; ctx.font="14px 'Tiny5'"; ctx.textAlign="center"; ctx.fillText(p.name, 0, -35);
         ctx.strokeStyle = "#000"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0, 0, p.r, 0, 6.3); ctx.stroke();
         ctx.rotate(p.rot); ctx.fillStyle = color; ctx.beginPath(); ctx.arc(0, 0, p.r, 0, 6.3); ctx.fill();
         ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(8,-5,3,0,6.3); ctx.fill(); ctx.beginPath(); ctx.arc(-8,-5,3,0,6.3); ctx.fill();
         ctx.restore();
         
         ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(isMe ? myAngle : p.angle);
-        const s = p.swing ? Math.sin(p.swing * 0.5) * 45 : 0; ctx.rotate(s * Math.PI / 180);
-        ctx.fillStyle = color; ctx.strokeStyle="#000"; ctx.lineWidth=2; 
-        ctx.beginPath(); ctx.arc(35, 0, 8, 0, 6.3); ctx.fill(); ctx.stroke(); // Hand
+        const s = p.swing ? Math.sin(p.swing * 0.4) * 50 : 0; ctx.rotate(s * Math.PI / 180);
+        ctx.fillStyle = color; ctx.strokeStyle="#000"; ctx.lineWidth=3; 
+        ctx.beginPath(); ctx.arc(38, 0, 9, 0, 6.3); ctx.fill(); ctx.stroke(); 
         
-        const itm = isMe ? (ME.inventory[0]?.name) : p.item;
-        if(itm === 'SWORD') { ctx.fillStyle = "#888"; ctx.fillRect(40, -4, 50, 8); ctx.strokeRect(40, -4, 50, 8); }
-        else if(itm === 'STICK') { ctx.fillStyle = "#634"; ctx.fillRect(40, -3, 40, 6); ctx.strokeRect(40, -3, 40, 6); }
+        const itm = isMe ? (ME.inventory[selectedSlot]?.name) : p.item;
+        if(itm === 'SWORD') { ctx.fillStyle = "#aaa"; ctx.fillRect(45, -5, 60, 10); ctx.strokeRect(45, -5, 60, 10); }
+        else if(itm === 'STICK') { ctx.fillStyle = "#754"; ctx.fillRect(45, -4, 45, 8); ctx.strokeRect(45, -4, 45, 8); }
         ctx.restore();
     }
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // PLATFORMS
+        bgCtx.fillStyle = "#000"; bgCtx.fillRect(0,0,bgCanvas.width,bgCanvas.height);
+        bgCtx.fillStyle = "#00d2ff"; for(let i=0; i<40; i++) bgCtx.fillRect(Math.random()*bgCanvas.width, Math.random()*bgCanvas.height, 2, 2);
+
         PLATFORMS.forEach(p => {
-            // Dirt
-            ctx.fillStyle = "#643"; ctx.fillRect(p.x, p.y+10, p.w, p.h-10);
-            for(let i=0; i<p.w; i+=10) { ctx.fillStyle = "#532"; ctx.fillRect(p.x+i+(i%3), p.y+20+(i%5), 4, 4); }
-            // Grass
-            ctx.fillStyle = "#4a2"; ctx.fillRect(p.x, p.y, p.w, 12);
-            ctx.fillStyle = "#281"; for(let i=0; i<p.w; i+=8) { ctx.fillRect(p.x+i, p.y+(i%2?4:0), 4, 4); }
+            ctx.fillStyle = "#643"; ctx.fillRect(p.x, p.y+12, p.w, p.h-12); 
+            for(let i=0; i<p.w; i+=15) { ctx.fillStyle = "#532"; ctx.fillRect(p.x+i+(i%4), p.y+20+(i%6), 5, 5); } 
+            ctx.fillStyle = "#4a2"; ctx.fillRect(p.x, p.y, p.w, 14); 
+            ctx.fillStyle = "#281"; for(let i=0; i<p.w; i+=10) { ctx.fillRect(p.x+i, p.y+(i%3?5:0), 5, 5); } 
         });
-        // LAVA
-        for(let x=0; x<canvas.width; x+=20) {
-            ctx.fillStyle = (x+lavaFrame)%40 < 20 ? "#f40" : "#d30";
-            ctx.fillRect(x, LAVA_Y, 20, 100);
-            if(lavaFrame % 30 < 15) { ctx.fillStyle="#fa0"; ctx.fillRect(x+5, LAVA_Y+10, 4, 4); }
+
+        for(let x=0; x<canvas.width; x+=30) {
+            ctx.fillStyle = (x+lavaFrame*2)%60 < 30 ? "#f40" : "#d30";
+            ctx.fillRect(x, LAVA_Y, 30, 400);
+            if(lavaFrame % 40 < 20) { ctx.fillStyle="#fa0"; ctx.fillRect(x+10, LAVA_Y+15, 6, 6); }
         }
+
         droppedItems.forEach(i => {
-            ctx.fillStyle = "#000"; ctx.fillRect(i.x-12, i.y-12, 24, 24);
-            ctx.fillStyle = i.name==='NUKE'?"#444":"#888"; ctx.fillRect(i.x-10, i.y-10, 20, 20);
+            ctx.fillStyle = "#000"; ctx.fillRect(i.x-15, i.y-15, 30, 30);
+            ctx.fillStyle = (i.name==='NUKE')?"#444":"#888"; ctx.fillRect(i.x-12, i.y-12, 24, 24);
         });
-        projectiles.forEach(p => { ctx.fillStyle = p.type==='NUKE'?"#333":"#fff"; ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, 6.3); ctx.fill(); });
-        beams.forEach(b => { ctx.strokeStyle = "rgba(255,0,0,0.8)"; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(b.sx, b.sy); ctx.lineTo(b.sx + Math.cos(b.angle)*2000, b.sy + Math.sin(b.angle)*2000); ctx.stroke(); });
+
+        projectiles.forEach(p => { ctx.fillStyle = p.type==='NUKE'?"#333":"#fff"; ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 6.3); ctx.fill(); });
+        beams.forEach(b => { ctx.strokeStyle = "rgba(255,0,0,0.8)"; ctx.lineWidth = 12; ctx.beginPath(); ctx.moveTo(b.sx, b.sy); ctx.lineTo(b.sx + Math.cos(b.angle)*2500, b.sy + Math.sin(b.angle)*2500); ctx.stroke(); });
+        explosions.forEach(e => { ctx.strokeStyle = "orange"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 6.3); ctx.stroke(); });
+
         drawPlayer(ME, ME.color, true); drawPlayer(OTHER, OTHER.color, false);
     }
 
     function gameLoop() { update(); draw(); if(isGameRunning) requestAnimationFrame(gameLoop); }
+    function toggleCheat(c) { if(c==='fly') cheatFly=!cheatFly; if(c==='luck') cheatLuck=!cheatLuck; }
     function updateUI() {
         document.getElementById('score-me-display').innerText = `ME: ${scores.me}`;
         document.getElementById('score-enemy-display').innerText = `${OTHER.name}: ${scores.enemy}`;
-        const near = droppedItems.find(i => Math.hypot(i.x-ME.x, i.y-ME.y)<50);
+        const m = Math.floor(matchTime/60), s = matchTime%60;
+        document.getElementById('match-timer').innerText = `${m}:${s<10?'0':''}${s}`;
+        const near = droppedItems.find(i => Math.hypot(i.x-ME.x, i.y-ME.y)<60);
         document.getElementById('pickup-prompt').style.display = near?'block':'none';
         if(near) document.getElementById('item-name').innerText = near.name;
-        for(let i=0; i<3; i++) { const slot = document.getElementById('slot-'+i); const itm = ME.inventory[i]; slot.innerHTML = itm ? `${itm.name}<br>${itm.ammo===Infinity?'':itm.ammo}` : "EMPTY"; slot.className = (i===0)?"inv-slot inv-active":"inv-slot"; }
+        for(let i=0; i<3; i++) { 
+            const slot = document.getElementById('slot-'+i); const itm = ME.inventory[i];
+            slot.innerHTML = itm ? `${itm.name}<br>${itm.ammo===Infinity?'':itm.ammo}` : "EMPTY";
+            slot.className = (i === selectedSlot) ? "inv-slot inv-active" : "inv-slot";
+        }
+        const isR = ME.inventory.some(i => i.name === 'NUKE' || i.name === 'LASER');
+        document.getElementById('rare-warning').style.display = isR ? 'block' : 'none';
     }
     function showMenu(id) { document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none'); document.getElementById(id).style.display = 'block'; }
-    function animParticles() { bgCtx.fillStyle = "#000"; bgCtx.fillRect(0,0,bgCanvas.width,bgCanvas.height); bgCtx.fillStyle = "#00d2ff"; for(let i=0; i<30; i++) bgCtx.fillRect(Math.random()*bgCanvas.width, Math.random()*bgCanvas.height, 2, 2); if(!isGameRunning) requestAnimationFrame(animParticles); }
-    animParticles();
 </script>
 </body>
 </html>
