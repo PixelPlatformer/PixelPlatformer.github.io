@@ -3,606 +3,524 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Platformer: Aim Update</title>
+    <title>Pixel Platformer: Tactical</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tiny5&display=swap" rel="stylesheet">
     
     <style>
-        /* --- GLOBAL & RESET --- */
-        body { 
-            margin: 0; 
-            background: #000; 
-            color: #fff; 
-            font-family: 'Tiny5', sans-serif; 
-            overflow: hidden; 
-            cursor: crosshair; /* Crosshair cursor for aiming */
-        }
-        canvas { display: block; margin: 0 auto; background: #87CEEB; /* Sky Blue Background */ border: 2px solid #333; }
+        /* --- GLOBAL --- */
+        body { margin: 0; background: #000; color: #fff; font-family: 'Tiny5', sans-serif; overflow: hidden; cursor: crosshair; }
         
-        /* --- THEME --- */
-        .neon-text {
-            color: #fff;
-            text-shadow: 0 0 5px #000;
-        }
+        /* --- PARTICLES CANVAS (Background) --- */
+        #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
+
+        /* --- GAME CANVAS --- */
+        #gameCanvas { display: none; margin: 0 auto; background: #000; border: 2px solid #333; position: relative; z-index: 10; }
+
+        /* --- UI ELEMENTS --- */
+        .neon-text { color: #fff; text-shadow: 0 0 5px #fff, 0 0 10px #aaa; }
         
-        /* SCOREBOARD */
-        #scoreboard {
-            position: absolute; top: 10px; right: 20px;
-            text-align: right; pointer-events: none;
-        }
-        .score-entry { font-size: 24px; color: #fff; text-shadow: 2px 2px 0 #000; margin-bottom: 5px; }
-
-        /* LOADING SCREEN */
-        #loading-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: #000;
-            z-index: 9999;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            transition: opacity 0.5s ease;
-        }
-        .loader-box { position: relative; width: 100px; height: 100px; margin-bottom: 20px; margin-top: 20px; }
-        .loader-box span {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            transform: rotate(calc(30deg * var(--i)));
-        }
-        .loader-box span::before {
-            content: ''; position: absolute; top: 0; left: 0; width: 15px; height: 15px;
-            background: #fff; box-shadow: 0 0 10px #fff, 0 0 20px #fff;
-            opacity: 0; animation: fadeSquare 1s linear infinite;
-            animation-delay: calc(1s / 12 * var(--i));
-        }
-        @keyframes fadeSquare {
-            0% { opacity: 1; transform: scale(1.2); } 80%, 100% { opacity: 0; transform: scale(1); }
-        }
-        .loader-hidden { opacity: 0; pointer-events: none; }
-
         /* MENUS */
         .menu-screen { 
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: transparent; 
-            padding: 40px; 
-            text-align: center; display: none; z-index: 100; min-width: 300px;
+            text-align: center; display: none; z-index: 100; min-width: 400px;
         }
         #main-menu { display: block; }
-        
+
         .btn { 
             background: #000; color: #fff; border: 2px solid #fff; 
-            padding: 10px 20px; font-family: 'Tiny5'; font-size: 20px; cursor: pointer; margin: 10px;
-            text-transform: uppercase; transition: 0.2s;
+            padding: 15px 30px; font-family: 'Tiny5'; font-size: 24px; cursor: pointer; margin: 10px;
+            text-transform: uppercase; transition: 0.2s; display: block; width: 100%;
         }
-        .btn:hover { background: #fff; color: #000; box-shadow: 0 0 20px #fff; }
+        .btn:hover { background: #fff; color: #000; box-shadow: 0 0 15px #fff; }
+
         input { 
             background: #000; color: #fff; border: 2px solid #fff;
-            font-family: 'Tiny5'; font-size: 20px; padding: 10px; text-align: center; outline: none;
+            font-family: 'Tiny5'; font-size: 24px; padding: 10px; text-align: center; outline: none; width: 100%; margin-bottom: 10px;
         }
 
-        /* UI OVERLAY */
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; }
+        /* COUNTDOWN OVERLAY */
+        #countdown-overlay {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 150px; color: #fff; text-shadow: 0 0 20px #fff; 
+            display: none; z-index: 9999; pointer-events: none;
+        }
+
+        /* IN-GAME UI */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; z-index: 20; }
+        
+        #scoreboard { position: absolute; top: 20px; right: 20px; text-align: right; }
+        .score-entry { font-size: 24px; color: #fff; margin-bottom: 5px; }
+
+        #power-display { position: absolute; top: 20px; left: 20px; font-size: 20px; color: #ffff00; }
+
         #rng-box {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(0,0,0,0.5); border: 3px solid #fff; padding: 15px; width: 150px;
+            background: rgba(0,0,0,0.8); border: 2px solid #fff; padding: 10px 30px;
             text-align: center; pointer-events: auto; cursor: pointer;
-            box-shadow: 0 0 10px #fff;
         }
     </style>
 </head>
 <body>
 
-    <div id="loading-screen">
-        <h1 class="neon-text" style="font-size: 50px; letter-spacing: 5px; margin: 0;">PIXEL PLATFORMER</h1>
-        <div class="loader-box">
-            <span style="--i:1;"></span><span style="--i:2;"></span><span style="--i:3;"></span>
-            <span style="--i:4;"></span><span style="--i:5;"></span><span style="--i:6;"></span>
-            <span style="--i:7;"></span><span style="--i:8;"></span><span style="--i:9;"></span>
-            <span style="--i:10;"></span><span style="--i:11;"></span><span style="--i:12;"></span>
-        </div>
-        <p style="color: #888; letter-spacing: 2px;">LOADING...</p>
-    </div>
+    <canvas id="bg-canvas"></canvas>
 
     <div id="main-menu" class="menu-screen">
-        <h1 class="neon-text" style="font-size: 60px; margin: 0; margin-bottom: 20px; text-shadow: 4px 4px 0 #000;">PIXEL PLATFORMER</h1>
-        <button class="btn" onclick="startSingle()">Single Player</button>
-        <button class="btn" onclick="showMenu('multi-menu')">Multiplayer</button>
+        <h1 class="neon-text" style="font-size: 80px; margin-bottom: 40px;">PIXEL FIGHT</h1>
+        <button class="btn" onclick="setupHost()">HOST GAME</button>
+        <button class="btn" onclick="showMenu('join-menu')">JOIN GAME</button>
     </div>
 
-    <div id="multi-menu" class="menu-screen">
-        <h2 class="neon-text">MULTIPLAYER</h2>
-        <button class="btn" onclick="setupHost()">Host Game</button>
-        <button class="btn" onclick="showMenu('join-menu')">Join Game</button>
-        <br><button class="btn" onclick="showMenu('main-menu')" style="border-color: #555; color: #888;">Back</button>
-    </div>
-
-    <div id="host-menu" class="menu-screen">
-        <h2 class="neon-text">LOBBY</h2>
-        <p>CODE: <span id="host-code" style="color: #fff; font-size: 30px; border-bottom: 2px solid #fff;">...</span></p>
-        <p>Waiting for players...</p>
+    <div id="host-room" class="menu-screen">
+        <h2 class="neon-text" style="font-size: 40px;">HOSTING LOBBY</h2>
+        <p style="font-size: 20px; color: #aaa;">SHARE THIS CODE:</p>
+        <div id="host-code" style="font-size: 60px; color: #00ffff; border: 2px dashed #00ffff; margin: 20px 0; padding: 10px;">...</div>
+        <p id="player-status" style="color: #ffff00;">Waiting for player...</p>
+        <button class="btn" onclick="triggerCountdown()" id="start-btn" disabled style="opacity: 0.5;">START MATCH</button>
+        <button class="btn" onclick="location.reload()" style="border-color: #555; font-size: 18px;">CANCEL</button>
     </div>
 
     <div id="join-menu" class="menu-screen">
-        <h2 class="neon-text">JOIN</h2>
-        <input type="text" id="join-code" placeholder="ENTER CODE" maxlength="4">
-        <button class="btn" onclick="joinGame()">Connect</button>
-        <br><button class="btn" onclick="showMenu('multi-menu')" style="border-color: #555;">Back</button>
+        <h2 class="neon-text">JOIN LOBBY</h2>
+        <input type="text" id="join-code" placeholder="ENTER 4-LETTER CODE" maxlength="4">
+        <button class="btn" onclick="joinGame()">CONNECT</button>
+        <button class="btn" onclick="showMenu('main-menu')" style="border-color: #555;">BACK</button>
+        <p id="join-status" style="color: #ff4444; margin-top: 10px;"></p>
     </div>
 
+    <div id="countdown-overlay">5</div>
+    
     <div id="ui-layer">
         <div id="scoreboard">
             <div class="score-entry">ME: <span id="score-me">0</span></div>
-            <div class="score-entry" style="color: #ff4444;">ENEMY: <span id="score-enemy">0</span></div>
+            <div class="score-entry" style="color: #ff4444;">OPP: <span id="score-enemy">0</span></div>
         </div>
-
+        <div id="power-display">POWER: NONE</div>
         <div id="rng-box" onclick="spinRNG()">
-            <div style="font-size: 12px; color: #fff; margin-bottom: 5px;">CLICK FOR ITEM</div>
-            <div id="item-display" class="neon-text" style="font-size: 20px;">NOTHING</div>
-        </div>
-        
-        <div style="position: absolute; top: 20px; left: 20px; font-size: 16px;">
-            <div id="cooldown-msg" style="color: red; opacity: 0; font-weight: bold;">ROLL COOLDOWN</div>
+            <div style="font-size: 12px; color: #aaa;">CLICK FOR ITEM</div>
+            <div id="item-display" style="font-size: 24px; color: #fff;">NOTHING</div>
         </div>
     </div>
 
     <canvas id="gameCanvas" width="1000" height="600"></canvas>
 
 <script>
-    // --- CUSTOM ASSETS ---
-    const ASSETS = {
-        player: { src: '', color: '#fff' },
-        enemy:  { src: '', color: '#ff4444' },
-        sword:  { src: '' },
-        snowball: { src: '' }
-    };
+    // --- 1. PARTICLE SYSTEM (MENU BACKGROUND) ---
+    const bgCanvas = document.getElementById('bg-canvas');
+    const bgCtx = bgCanvas.getContext('2d');
+    let particles = [];
 
-    const sprites = {};
-    for (const key in ASSETS) {
-        if (ASSETS[key].src) {
-            const img = new Image();
-            img.src = ASSETS[key].src;
-            sprites[key] = img;
+    function resizeBg() { bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight; }
+    window.addEventListener('resize', resizeBg);
+    resizeBg();
+
+    class Particle {
+        constructor() {
+            this.x = Math.random() * bgCanvas.width;
+            this.y = Math.random() * bgCanvas.height;
+            this.size = Math.random() * 2 + 1;
+            this.speedX = Math.random() * 0.5 - 0.25;
+            this.speedY = Math.random() * 0.5 - 0.25;
+            this.alpha = Math.random();
+        }
+        update() {
+            this.x += this.speedX; this.y += this.speedY;
+            if (this.x < 0) this.x = bgCanvas.width;
+            if (this.x > bgCanvas.width) this.x = 0;
+            if (this.y < 0) this.y = bgCanvas.height;
+            if (this.y > bgCanvas.height) this.y = 0;
+        }
+        draw() {
+            bgCtx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+            bgCtx.beginPath(); bgCtx.arc(this.x, this.y, this.size, 0, Math.PI*2); bgCtx.fill();
         }
     }
+    for(let i=0; i<50; i++) particles.push(new Particle());
 
-    window.addEventListener('load', () => {
-        setTimeout(() => {
-            const l = document.getElementById('loading-screen');
-            l.style.opacity = '0';
-            setTimeout(() => l.remove(), 500);
-        }, 2000); 
-    });
+    function animateBg() {
+        bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+        particles.forEach(p => { p.update(); p.draw(); });
+        requestAnimationFrame(animateBg);
+    }
+    animateBg();
 
-    // --- PHYSICS CONFIG (SLOW & HEAVY) ---
+
+    // --- 2. GAME VARIABLES ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    const GRAVITY = 0.8;      
-    const JUMP_FORCE = -12;   // Very low jump
-    const SPEED = 2.0;        // Very slow movement
+    // Physics
+    const GRAVITY = 0.8;
+    const JUMP_FORCE = -12;
+    const BASE_SPEED = 1.5; // Very slow
     const GROUND = 500;
-    const ROLL_COOLDOWN = 1500; 
 
-    // --- MOUSE TRACKING ---
-    let mouseX = 0;
-    let mouseY = 0;
-    canvas.addEventListener('mousemove', (e) => {
-        const rect = canvas.getBoundingClientRect();
-        mouseX = e.clientX - rect.left;
-        mouseY = e.clientY - rect.top;
-    });
-
-    // --- GAME STATE ---
+    // State
     let myId = null;
     let peer = null;
     let conn = null;
     let isHost = false;
     let isGameRunning = false;
-    let projectiles = []; 
+    let canMove = false; // Locked during countdown
+    let projectiles = [];
     let scores = { me: 0, enemy: 0 };
-    let canRoll = true;
+    
+    // Mouse
+    let mouseX = 0;
+    let mouseY = 0;
+    document.addEventListener('mousemove', e => {
+        const rect = canvas.getBoundingClientRect();
+        mouseX = e.clientX - rect.left;
+        mouseY = e.clientY - rect.top;
+    });
 
-    // --- PLAYER OBJECTS ---
-    const ME = { 
-        x: 100, y: 300, w: 40, h: 40, 
-        vx: 0, vy: 0, 
-        item: 'Nothing', frozen: false, facingRight: true 
+    // Powers Logic
+    const POWERS = {
+        'NONE': { color: '#fff', desc: 'No Power' },
+        'FAST': { color: '#00ff00', desc: 'Speed +' },
+        'STRONG': { color: '#ff0000', desc: 'Knockback +' },
+        'SMALL': { color: '#ff00ff', desc: 'Tiny Hitbox' },
+        'TANK': { color: '#0000ff', desc: 'Heavy' }
     };
-    const OTHER = { 
-        x: 800, y: 300, w: 40, h: 40, 
-        color: '#ff4444', item: 'Nothing', frozen: false 
-    };
 
-    // --- ITEM RARITY ---
-    function getRandomItem() {
-        const r = Math.random() * 1000; 
-        
-        if (r <= 1) return 'LASER';
-        if (r <= 3) return 'TELEPORTER'; 
-        if (r <= 13) return 'NUKE'; 
-        
-        const standard = Math.random();
-        if (standard < 0.50) return 'NOTHING';        
-        if (standard < 0.70) return 'STICK';          
-        if (standard < 0.90) return 'SNOWBALL';       
-        return 'SWORD';                               
-    }
+    // Player Objects
+    const ME = { x: 100, y: 300, w: 40, h: 40, vx: 0, vy: 0, item: 'NOTHING', power: 'NONE', facingRight: true };
+    const OTHER = { x: 800, y: 300, w: 40, h: 40, color: '#ff4444', item: 'NOTHING' };
 
-    // --- ITEM USAGE (AIMED) ---
-    function useItem() {
-        if (ME.frozen) return;
 
-        // Calculate Angle to Mouse
-        const angle = Math.atan2(mouseY - (ME.y + ME.h/2), mouseX - (ME.x + ME.w/2));
-
-        // MELEE (Sword/Stick) - Attacks towards mouse direction
-        if (ME.item === 'SWORD' || ME.item === 'STICK') {
-            const range = (ME.item === 'SWORD') ? 80 : 60;
-            const force = (ME.item === 'SWORD') ? 20 : 15;
-            
-            // Check if enemy is in range AND generally in the direction of the mouse
-            const dist = Math.hypot((ME.x - OTHER.x), (ME.y - OTHER.y));
-            
-            // Simple check: Is mouse on the same side as enemy relative to me?
-            const mouseRight = mouseX > ME.x;
-            const enemyRight = OTHER.x > ME.x;
-            
-            if (dist < range && mouseRight === enemyRight) {
-                sendHit('KNOCKBACK', force);
-            }
-        }
-
-        // PROJECTILE (Snowball) - Flies to mouse
-        if (ME.item === 'SNOWBALL') {
-            const speed = 10;
-            const pVx = Math.cos(angle) * speed;
-            const pVy = Math.sin(angle) * speed;
-
-            projectiles.push({
-                x: ME.x + 20, y: ME.y + 20,
-                vx: pVx, vy: pVy,
-                owner: 'ME', type: 'snowball'
-            });
-            
-            ME.item = 'Nothing'; 
-            updateItemDisplay();
-            
-            if (conn) conn.send({ type: 'SPAWN_PROJ', x: ME.x, y: ME.y, vx: pVx, vy: pVy });
-        }
-
-        // RAYCAST (Laser) - Shoots line to mouse
-        if (ME.item === 'LASER') {
-            // Draw visual beam
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 5;
-            ctx.beginPath();
-            ctx.moveTo(ME.x + 20, ME.y + 20);
-            
-            // Extend line to edge of screen in mouse direction
-            const endX = ME.x + Math.cos(angle) * 1000;
-            const endY = ME.y + Math.sin(angle) * 1000;
-            ctx.lineTo(endX, endY);
-            ctx.stroke();
-
-            // Line vs Rectangle Collision Logic
-            if (lineRect(ME.x+20, ME.y+20, endX, endY, OTHER.x, OTHER.y, OTHER.w, OTHER.h)) {
-                sendHit('KNOCKBACK', 50);
-            }
-
-            ME.item = 'Nothing';
-            updateItemDisplay();
-        }
-
-        // GLOBAL (Nuke/Teleporter) - No aiming needed, still screen wipe
-        if (ME.item === 'NUKE') {
-            sendHit('NUKE', 100);
-            ME.item = 'Nothing';
-            updateItemDisplay();
-        }
-        if (ME.item === 'TELEPORTER') {
-            sendHit('TELEPORT', 0);
-            ME.item = 'Nothing';
-            updateItemDisplay();
-        }
-    }
-
-    // Helper: Line vs Rect Collision for Laser
-    function lineRect(x1, y1, x2, y2, rx, ry, rw, rh) {
-        const left = lineLine(x1,y1,x2,y2, rx,ry,rx, ry+rh);
-        const right = lineLine(x1,y1,x2,y2, rx+rw,ry, rx+rw,ry+rh);
-        const top = lineLine(x1,y1,x2,y2, rx,ry, rx+rw,ry);
-        const bottom = lineLine(x1,y1,x2,y2, rx,ry+rh, rx+rw,ry+rh);
-        return left || right || top || bottom;
-    }
-    function lineLine(x1, y1, x2, y2, x3, y3, x4, y4) {
-        const uA = ((x4-x3)*(y1-y3) - (y4-y3)*(x1-x3)) / ((y4-y3)*(x2-x1) - (x4-x3)*(y2-y1));
-        const uB = ((x2-x1)*(y1-y3) - (y2-y1)*(x1-x3)) / ((y4-y3)*(x2-x1) - (x4-x3)*(y2-y1));
-        return (uA >= 0 && uA <= 1 && uB >= 0 && uB <= 1);
-    }
-
-    function sendHit(effectType, force) {
-        const dir = (mouseX > ME.x) ? 1 : -1; // Knockback direction based on aim
-        if (conn) {
-            conn.send({ type: 'HIT', effect: effectType, force: force, dir: dir });
-        } else {
-            applyHitTo(OTHER, effectType, force, dir);
-        }
-    }
-
-    function applyHitTo(target, effect, force, dir) {
-        if (effect === 'KNOCKBACK') {
-            target.vx = dir * force;
-            target.vy = -5; 
-        }
-        if (effect === 'FREEZE') {
-            target.vx = dir * force;
-            target.frozen = true;
-            target.color = '#00ffff'; 
-            setTimeout(() => {
-                target.frozen = false;
-                target.color = isHost ? '#ff4444' : '#fff'; 
-            }, 500); 
-        }
-        if (effect === 'NUKE') {
-            target.vx = 50; target.vy = -50;
-        }
-        if (effect === 'TELEPORT') {
-            target.x = -100; target.y = -100;
-        }
-    }
-
-    function updateItemDisplay() {
-        document.getElementById('item-display').innerText = ME.item;
-        const disp = document.getElementById('item-display');
-        if (['NUKE','TELEPORTER','LASER'].includes(ME.item)) disp.style.color = '#ff00ff'; 
-        else if (ME.item === 'NOTHING') disp.style.color = '#555';
-        else disp.style.color = '#fff';
-    }
-
-    function updateScore() {
-        document.getElementById('score-me').innerText = scores.me;
-        document.getElementById('score-enemy').innerText = scores.enemy;
-    }
-
-    function spinRNG() {
-        if (ME.frozen) return;
-        const display = document.getElementById('item-display');
-        let i = 0;
-        const interval = setInterval(() => {
-            display.innerText = ['...','?','...'][i%3];
-            i++;
-            if (i > 5) {
-                clearInterval(interval);
-                ME.item = getRandomItem();
-                updateItemDisplay();
-            }
-        }, 100);
-    }
-
+    // --- 3. MENU & LOBBY LOGIC ---
     function showMenu(id) {
         document.querySelectorAll('.menu-screen').forEach(el => el.style.display = 'none');
         document.getElementById(id).style.display = 'block';
     }
+
     function generateId() { return Math.random().toString(36).substr(2, 4).toUpperCase(); }
 
     function setupHost() {
-        showMenu('host-menu');
+        showMenu('host-room');
         myId = generateId();
         document.getElementById('host-code').innerText = myId;
+        
         peer = new Peer(myId);
         peer.on('connection', (c) => {
             conn = c;
+            document.getElementById('player-status').innerText = "PLAYER JOINED! READY.";
+            document.getElementById('player-status').style.color = "#00ff00";
+            document.getElementById('start-btn').disabled = false;
+            document.getElementById('start-btn').style.opacity = "1";
             initConnection();
-            startGame();
         });
         isHost = true;
     }
 
     function joinGame() {
         const code = document.getElementById('join-code').value.toUpperCase();
+        if(code.length !== 4) return;
+        
+        document.getElementById('join-status').innerText = "Connecting...";
         peer = new Peer();
         peer.on('open', () => {
             conn = peer.connect(code);
             conn.on('open', () => {
+                document.getElementById('join-status').innerText = "Connected! Waiting for host...";
                 initConnection();
-                startGame();
             });
+            conn.on('close', () => alert("Host disconnected"));
         });
         isHost = false;
     }
 
+    // --- 4. COUNTDOWN SYSTEM ---
+    function triggerCountdown() {
+        if(conn) conn.send({ type: 'START_GAME' });
+        startGameSequence();
+    }
+
+    function startGameSequence() {
+        // Switch screens
+        document.querySelectorAll('.menu-screen').forEach(el => el.style.display = 'none');
+        document.getElementById('ui-layer').style.display = 'block';
+        canvas.style.display = 'block';
+
+        // Assign Random Power
+        const powerKeys = Object.keys(POWERS).filter(k => k !== 'NONE');
+        ME.power = powerKeys[Math.floor(Math.random() * powerKeys.length)];
+        applyPowerStats();
+        
+        // Reset Positions
+        ME.x = isHost ? 100 : 800;
+        ME.y = 0; ME.vx = 0; ME.vy = 0;
+        
+        isGameRunning = true;
+        canMove = false; // Freeze players
+        gameLoop(); // Start rendering
+        
+        // Start Countdown
+        let count = 5;
+        const overlay = document.getElementById('countdown-overlay');
+        overlay.style.display = 'block';
+        overlay.innerText = count;
+
+        const timer = setInterval(() => {
+            count--;
+            if(count > 0) {
+                overlay.innerText = count;
+            } else {
+                clearInterval(timer);
+                overlay.innerText = "FIGHT!";
+                setTimeout(() => overlay.style.display = 'none', 1000);
+                canMove = true; // Unlock movement
+            }
+        }, 1000);
+
+        setInterval(sendData, 20); // Start networking
+    }
+
+    function applyPowerStats() {
+        const p = POWERS[ME.power];
+        document.getElementById('power-display').innerText = `POWER: ${ME.power} (${p.desc})`;
+        document.getElementById('power-display').style.color = p.color;
+        
+        if (ME.power === 'SMALL') { ME.w = 25; ME.h = 25; }
+        if (ME.power === 'TANK') { ME.w = 50; ME.h = 50; }
+    }
+
+
+    // --- 5. GAME ENGINE ---
     function initConnection() {
         conn.on('data', (data) => {
+            if (data.type === 'START_GAME') startGameSequence();
+            
             if (data.x !== undefined) {
                 OTHER.x = data.x; OTHER.y = data.y; 
-                OTHER.item = data.item;
-                OTHER.facingRight = data.facingRight;
+                OTHER.item = data.item; OTHER.facingRight = data.facingRight;
+                // Sync powers visually (simplified)
+                if(data.power === 'SMALL') { OTHER.w = 25; OTHER.h = 25; }
+                else if(data.power === 'TANK') { OTHER.w = 50; OTHER.h = 50; }
+                else { OTHER.w = 40; OTHER.h = 40; }
             }
-            if (data.type === 'HIT') {
-                applyHitTo(ME, data.effect, data.force, data.dir);
-            }
-            if (data.type === 'SPAWN_PROJ') {
-                projectiles.push({
-                    x: data.x, y: data.y, vx: data.vx, vy: data.vy, owner: 'OTHER', type: 'snowball'
-                });
-            }
-            if (data.type === 'DEATH') {
-                scores.me++; 
-                updateScore();
-            }
+            if (data.type === 'HIT') applyHit(ME, data.force, data.dir);
+            if (data.type === 'DEATH') { scores.me++; updateScore(); }
+            if (data.type === 'PROJ') projectiles.push(data.obj);
         });
     }
 
-    function startSingle() { startGame(); }
-
-    function startGame() {
-        document.querySelectorAll('.menu-screen').forEach(el => el.style.display = 'none');
-        document.getElementById('ui-layer').style.display = 'block';
-        ME.x = isHost ? 100 : 800;
-        isGameRunning = true;
-        gameLoop();
-        setInterval(sendData, 20);
-    }
-
     function sendData() {
-        if (conn && conn.open) {
-            conn.send({ x: ME.x, y: ME.y, item: ME.item, facingRight: ME.facingRight });
-        }
-    }
-
-    const keys = {};
-    window.addEventListener('keydown', e => {
-        keys[e.key.toLowerCase()] = true;
-        if (e.key === ' ' && ME.item !== 'Nothing') useItem(); 
-        if (e.key === 'e') spinRNG();
-        if (e.key.toLowerCase() === 'shift') tryRoll();
-    });
-    window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-
-    function tryRoll() {
-        if (canRoll && !ME.frozen) {
-            ME.rolling = true;
-            ME.vx = ME.facingRight ? 8 : -8; 
-            canRoll = false;
-            
-            const msg = document.getElementById('cooldown-msg');
-            msg.style.opacity = 1;
-
-            setTimeout(() => ME.rolling = false, 300); 
-            setTimeout(() => {
-                canRoll = true;
-                msg.style.opacity = 0;
-            }, ROLL_COOLDOWN);
+        if(conn && conn.open) {
+            conn.send({ 
+                x: ME.x, y: ME.y, item: ME.item, facingRight: ME.facingRight, power: ME.power 
+            });
         }
     }
 
     function update() {
-        if (ME.frozen) return; 
-
-        // AIMING FACING
-        ME.facingRight = (mouseX > ME.x);
-
-        let speed = SPEED;
-        if (ME.item === 'STICK') speed = SPEED * 0.9; 
+        if (!isGameRunning) return;
         
-        if (keys['a']) { ME.vx = -speed; }
-        else if (keys['d']) { ME.vx = speed; }
-        else if (!ME.rolling) { ME.vx *= 0.8; } 
+        // MOVEMENT
+        if (canMove) {
+            let spd = BASE_SPEED;
+            if (ME.power === 'FAST') spd *= 1.5;
+            if (ME.power === 'TANK') spd *= 0.8;
 
-        if (keys['w'] && ME.y + ME.h >= GROUND) {
-            ME.vy = JUMP_FORCE;
+            if (keys['a']) ME.vx = -spd;
+            else if (keys['d']) ME.vx = spd;
+            else ME.vx *= 0.8;
+
+            if (keys['w'] && ME.y + ME.h >= GROUND) ME.vy = JUMP_FORCE;
+            
+            ME.facingRight = (mouseX > ME.x);
         }
 
+        // PHYSICS
         ME.vy += GRAVITY;
         ME.x += ME.vx;
         ME.y += ME.vy;
 
-        if (ME.y + ME.h > GROUND) {
-            ME.y = GROUND - ME.h;
-            ME.vy = 0; 
+        if (ME.y + ME.h > GROUND) { ME.y = GROUND - ME.h; ME.vy = 0; }
+
+        // VOID CHECK
+        if (ME.y > 600 || ME.x < -100 || ME.x > 1100) {
+            ME.x = 500; ME.y = 0; ME.vx = 0; ME.vy = 0;
+            scores.enemy++; updateScore();
+            if(conn) conn.send({type: 'DEATH'});
         }
 
-        if (ME.x < -100 || ME.x > canvas.width + 100 || ME.y < -100) {
-            ME.x = 400; ME.y = 0; ME.vx = 0; ME.vy = 0;
-            ME.frozen = false;
-            scores.enemy++; 
-            updateScore();
-            if (conn) conn.send({ type: 'DEATH' });
-        }
-
-        for (let i = projectiles.length - 1; i >= 0; i--) {
-            let p = projectiles[i];
-            p.x += p.vx;
-            p.y += p.vy;
-            p.vy += 0.2; 
-
+        // PROJECTILES
+        projectiles.forEach((p, i) => {
+            p.x += p.vx; p.y += p.vy;
+            // Collision
             let target = (p.owner === 'ME') ? OTHER : ME;
-            
             if (target.x < p.x + 10 && target.x + target.w > p.x &&
                 target.y < p.y + 10 && target.y + target.h > p.y) {
                 
-                if (p.owner === 'OTHER') {
-                    // Snowball knocks back in direction it was flying
-                    applyHitTo(ME, 'FREEZE', 10, (p.vx > 0 ? 1 : -1));
-                }
-                projectiles.splice(i, 1);
-                continue;
-            }
-
-            if (p.y > GROUND || p.x < 0 || p.x > 1000) {
+                if (p.owner !== 'ME') applyHit(ME, 10, (p.vx > 0 ? 1 : -1));
                 projectiles.splice(i, 1);
             }
-        }
+        });
     }
 
     function draw() {
-        // SKY
-        ctx.fillStyle = '#87CEEB';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // GROUND: GRASS TOP
-        ctx.fillStyle = '#4caf50'; // Green
-        ctx.fillRect(0, GROUND, canvas.width, 20);
-
-        // GROUND: DIRT BOTTOM
-        ctx.fillStyle = '#5d4037'; // Brown
-        ctx.fillRect(0, GROUND+20, canvas.width, 100);
+        // Clear (Black)
+        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Floor
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, GROUND); ctx.lineTo(1000, GROUND); ctx.stroke();
 
         // Projectiles
         ctx.fillStyle = '#fff';
         projectiles.forEach(p => {
-            if (sprites.snowball) {
-                ctx.drawImage(sprites.snowball, p.x, p.y, 20, 20);
-            } else {
-                ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI*2); ctx.fill();
-            }
+            ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI*2); ctx.fill();
         });
 
-        drawPlayer(ME, ASSETS.player.color, sprites.player);
-        drawPlayer(OTHER, ASSETS.enemy.color, sprites.enemy);
-        
-        // DRAW AIM CURSOR (Optional visual aid)
-        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-        ctx.beginPath();
-        ctx.arc(mouseX, mouseY, 10, 0, Math.PI*2);
-        ctx.moveTo(mouseX-15, mouseY); ctx.lineTo(mouseX+15, mouseY);
-        ctx.moveTo(mouseX, mouseY-15); ctx.lineTo(mouseX, mouseY+15);
-        ctx.stroke();
+        drawPlayer(ME, '#fff');
+        drawPlayer(OTHER, '#ff4444');
     }
 
-    function drawPlayer(p, defaultColor, sprite) {
-        if (sprite) {
-            ctx.drawImage(sprite, p.x, p.y, p.w, p.h);
-        } else {
-            ctx.fillStyle = defaultColor;
-            ctx.fillRect(p.x, p.y, p.w, p.h);
-        }
+    function drawPlayer(p, color) {
+        ctx.fillStyle = color;
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+
+        // ITEM MODELS
+        ctx.save();
+        ctx.translate(p.x + p.w/2, p.y + p.h/2);
         
-        // Draw Item Held
-        if (p.item !== 'NOTHING') {
-            ctx.fillStyle = '#fff';
-            ctx.font = '10px Arial';
-            ctx.fillText(p.item, p.x, p.y - 10);
-            
-            // Draw simple stick indicating aim direction (visual only)
-            if (p === ME) {
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(p.x + p.w/2, p.y + p.h/2);
-                const angle = Math.atan2(mouseY - (p.y + p.h/2), mouseX - (p.x + p.w/2));
-                ctx.lineTo((p.x + p.w/2) + Math.cos(angle)*30, (p.y + p.h/2) + Math.sin(angle)*30);
-                ctx.stroke();
+        // Aim Angle
+        let angle = 0;
+        if(p === ME) angle = Math.atan2(mouseY - (p.y + p.h/2), mouseX - (p.x + p.w/2));
+        else angle = (p.facingRight ? 0 : Math.PI); // Simplified for other
+
+        ctx.rotate(angle);
+
+        // Draw Hands/Items
+        ctx.fillStyle = color;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+
+        if (p.item === 'NOTHING') {
+            // Fists: Two small circles
+            ctx.beginPath(); ctx.arc(15, 10, 5, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(15, -10, 5, 0, Math.PI*2); ctx.fill();
+        }
+        else if (p.item === 'SNOWBALL') {
+            // White circle with outline
+            ctx.beginPath(); ctx.arc(20, 0, 8, 0, Math.PI*2); 
+            ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
+        }
+        else if (p.item === 'SWORD') {
+            // Long blade
+            ctx.fillStyle = '#ccc';
+            ctx.fillRect(10, -2, 40, 4); // Blade
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(0, -2, 10, 4);  // Handle
+        }
+        else if (p.item === 'STICK') {
+            // Brown line
+            ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(30,0); ctx.stroke();
+        }
+        else if (p.item === 'LASER') {
+             // Red Box
+             ctx.fillStyle = 'red'; ctx.fillRect(10, -5, 20, 10);
+        }
+
+        ctx.restore();
+    }
+
+    // --- 6. ACTIONS (ATTACK/ITEMS) ---
+    const keys = {};
+    window.addEventListener('keydown', e => {
+        keys[e.key.toLowerCase()] = true;
+        if (e.key === ' ' && canMove) useItem(); 
+        if (e.key === 'e') spinRNG();
+    });
+    window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+    function useItem() {
+        const angle = Math.atan2(mouseY - (ME.y + ME.h/2), mouseX - (ME.x + ME.w/2));
+        const dir = (mouseX > ME.x) ? 1 : -1;
+
+        // PUNCH (Default)
+        if (ME.item === 'NOTHING') {
+            if(checkHit(40)) sendHit(5, dir); // Weak punch
+        }
+        // SWORD
+        else if (ME.item === 'SWORD') {
+            let dmg = 20; if(ME.power === 'STRONG') dmg *= 1.5;
+            if(checkHit(70)) sendHit(dmg, dir);
+        }
+        // STICK
+        else if (ME.item === 'STICK') {
+            if(checkHit(60)) sendHit(15, dir);
+        }
+        // SNOWBALL
+        else if (ME.item === 'SNOWBALL') {
+            const spd = 10;
+            const p = { 
+                x: ME.x + 20, y: ME.y + 20, 
+                vx: Math.cos(angle)*spd, vy: Math.sin(angle)*spd, 
+                owner: 'ME' 
+            };
+            projectiles.push(p);
+            if(conn) conn.send({type: 'PROJ', obj: Object.assign({}, p, {owner:'OTHER'}) });
+            ME.item = 'NOTHING'; updateUI();
+        }
+        // LASER
+        else if (ME.item === 'LASER') {
+            // Visual Beam
+            ctx.strokeStyle = 'red'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(ME.x+20, ME.y+20);
+            ctx.lineTo(ME.x + Math.cos(angle)*1000, ME.y + Math.sin(angle)*1000);
+            ctx.stroke();
+            // Hit check (Line vs Rect logic simplified for demo: just checks direction + y level)
+            let enemyAngle = Math.atan2(OTHER.y - ME.y, OTHER.x - ME.x);
+            let diff = Math.abs(angle - enemyAngle);
+            if (diff < 0.2) sendHit(40, dir);
+            ME.item = 'NOTHING'; updateUI();
+        }
+    }
+
+    function checkHit(range) {
+        const dx = Math.abs((ME.x + ME.w/2) - (OTHER.x + OTHER.w/2));
+        const dy = Math.abs((ME.y + ME.h/2) - (OTHER.y + OTHER.h/2));
+        const mouseSide = (mouseX > ME.x);
+        const enemySide = (OTHER.x > ME.x);
+        return (dx < range && dy < 50 && mouseSide === enemySide);
+    }
+
+    function sendHit(force, dir) {
+        if(conn) conn.send({ type: 'HIT', force: force, dir: dir });
+        // Local testing only: applyHit(OTHER, force, dir);
+    }
+
+    function applyHit(p, force, dir) {
+        p.vx = dir * force;
+        p.vy = -5;
+    }
+
+    // --- 7. UTILS ---
+    function spinRNG() {
+        let items = ['SWORD', 'STICK', 'SNOWBALL', 'LASER'];
+        let i = 0;
+        let t = setInterval(() => {
+            document.getElementById('item-display').innerText = items[i % items.length];
+            i++;
+            if(i>10) {
+                clearInterval(t);
+                ME.item = items[Math.floor(Math.random() * items.length)];
+                updateUI();
             }
-        }
-        
-        if (p.frozen) {
-            ctx.strokeStyle = '#00ffff';
-            ctx.strokeRect(p.x-5, p.y-5, p.w+10, p.h+10);
-        }
+        }, 50);
+    }
+    
+    function updateUI() { document.getElementById('item-display').innerText = ME.item; }
+    function updateScore() { 
+        document.getElementById('score-me').innerText = scores.me; 
+        document.getElementById('score-enemy').innerText = scores.enemy; 
     }
 
     function gameLoop() {
-        if (!isGameRunning) return;
-        update();
-        draw();
-        requestAnimationFrame(gameLoop);
+        if(isGameRunning) { update(); draw(); requestAnimationFrame(gameLoop); }
     }
 
 </script>
