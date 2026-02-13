@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Platformer: Chaos Edition</title>
+    <title>Pixel Platformer: Combat Master</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tiny5&display=swap" rel="stylesheet">
     <style>
@@ -17,58 +17,58 @@
             background: rgba(0,0,0,0.95); padding: 30px; border: 2px solid #00d2ff;
         }
         #main-menu { display: block; }
-        .btn { 
-            background: #000; color: #fff; border: 2px solid #00d2ff; 
-            padding: 15px 30px; font-family: 'Tiny5'; font-size: 24px; cursor: pointer; margin: 10px 0;
-            text-transform: uppercase; width: 100%;
-        }
+        .btn { background: #000; color: #fff; border: 2px solid #00d2ff; padding: 12px 20px; font-family: 'Tiny5'; font-size: 20px; cursor: pointer; margin: 8px 0; text-transform: uppercase; width: 100%; }
         .btn:hover { background: #00d2ff; color: #000; }
-        .btn-kick { border-color: #ff4444; color: #ff4444; width: auto; padding: 5px 10px; font-size: 14px; }
-        input { background: #000; color: #fff; border: 2px solid #00d2ff; font-family: 'Tiny5'; font-size: 24px; padding: 10px; width: 100%; text-align: center; box-sizing: border-box; }
+        input { background: #000; color: #fff; border: 2px solid #00d2ff; font-family: 'Tiny5'; font-size: 20px; padding: 10px; width: 100%; text-align: center; box-sizing: border-box; }
 
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; z-index: 20; }
         #scoreboard { position: absolute; top: 20px; right: 20px; text-align: right; }
+        #match-timer { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 40px; color: #fff; text-shadow: 0 0 10px #000; }
+        
+        #inventory-ui { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+        .inv-slot { width: 70px; height: 70px; background: rgba(0,0,0,0.6); border: 2px solid #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; }
+        .inv-active { border-color: #ffff00; box-shadow: 0 0 10px #ffff00; }
+        
+        #pickup-prompt { position: absolute; bottom: 190px; left: 50%; transform: translateX(-50%); color: #ffff00; font-size: 20px; display: none; }
         #rng-box { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); border: 2px solid #fff; padding: 10px 30px; pointer-events: auto; cursor: pointer; }
+        #admin-panel { position: absolute; top: 60px; left: 20px; background: rgba(0,0,0,0.8); border: 1px solid red; padding: 10px; pointer-events: auto; display: none; }
     </style>
 </head>
 <body>
     <canvas id="bg-canvas"></canvas>
-    
     <div id="main-menu" class="menu-screen">
-        <h1 style="font-size: 60px; color: #00d2ff; margin-bottom: 20px;">PIXEL PLATFORMER</h1>
+        <h1 style="font-size: 50px; color: #00d2ff;">PIXEL PLATFORMER</h1>
         <input type="text" id="player-name-input" placeholder="ENTER NAME" maxlength="10">
         <button class="btn" onclick="setupHost()">HOST GAME</button>
         <button class="btn" onclick="showMenu('join-menu')">JOIN GAME</button>
     </div>
-
     <div id="join-menu" class="menu-screen">
         <h2>JOIN GAME</h2>
-        <input type="text" id="join-code-input" placeholder="4-LETTER CODE" maxlength="4">
+        <input type="text" id="join-code-input" placeholder="4-LETTER CODE">
         <button class="btn" onclick="joinGame()">CONNECT</button>
         <button class="btn" onclick="showMenu('main-menu')">BACK</button>
     </div>
-
     <div id="host-lobby" class="menu-screen">
-        <h2>LOBBY CREATED</h2>
-        <div id="host-code-display" style="font-size: 50px; color: #00ffff; margin: 20px; border: 2px dashed #00ffff; padding: 10px;">...</div>
-        <div id="player-list" style="margin-bottom: 20px; text-align: left;">
-            <p>1. HOST (YOU)</p>
-            <div id="opponent-entry"></div>
-        </div>
+        <h2>LOBBY: <span id="host-code-display" style="color: #00ffff;">...</span></h2>
+        <div id="opponent-entry">Waiting for player...</div>
         <button class="btn" onclick="triggerStart()" id="start-btn" disabled>START MATCH</button>
-        <button class="btn" onclick="location.reload()" style="border-color: #555;">CANCEL</button>
     </div>
 
     <div id="ui-layer">
-        <div id="scoreboard">
-            <div id="score-me-display">ME: 0</div>
-            <div id="score-enemy-display" style="color: #ff4444;">OPP: 0</div>
+        <div id="match-timer">03:00</div>
+        <div id="admin-panel">
+            <button class="btn" onclick="toggleCheat('fly')">FLY</button>
+            <button class="btn" onclick="toggleCheat('luck')">LUCK</button>
         </div>
-        <div id="rng-box" onclick="spinRNG()">
-            <div id="item-display" style="font-size: 24px;">NOTHING</div>
+        <div id="scoreboard"><div id="score-me-display">ME: 0</div><div id="score-enemy-display" style="color: #ff4444;">OPP: 0</div></div>
+        <div id="pickup-prompt">PRESS 'R' TO PICK UP <span id="item-name"></span></div>
+        <div id="inventory-ui">
+            <div class="inv-slot inv-active" id="slot-0">EMPTY</div>
+            <div class="inv-slot" id="slot-1">EMPTY</div>
+            <div class="inv-slot" id="slot-2">EMPTY</div>
         </div>
+        <div id="rng-box" onclick="spinRNG()"><div>CLICK FOR ITEM</div><div id="item-display">NOTHING</div></div>
     </div>
-
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -77,36 +77,29 @@
     const bgCanvas = document.getElementById('bg-canvas');
     const bgCtx = bgCanvas.getContext('2d');
 
-    // --- GAME DATA ---
-    const ISLAND_Y = 400, ISLAND_X = 200, ISLAND_W = 600;
-    const GRAVITY = 0.7, JUMP = -13, BASE_SPEED = 2.0;
+    const PLATFORMS = [{ x: 100, y: 500, w: 400, h: 40 }, { x: 600, y: 400, w: 400, h: 40 }, { x: 1100, y: 500, w: 400, h: 40 }, { x: 400, y: 200, w: 300, h: 30 }];
+    const LAVA_Y = 580;
 
     let isGameRunning = false, isHost = false, conn, peer, myId;
     let mouseX = 0, mouseY = 0, myAngle = 0;
-    let projectiles = [], scores = { me: 0, enemy: 0 };
+    let projectiles = [], explosions = [], beams = [], droppedItems = [], scores = { me: 0, enemy: 0 };
+    let cheatFly = false, cheatLuck = false, rollTimer = 0, attackTimer = 0, matchTime = 180;
 
-    const ME = { x: 0, y: 0, r: 20, vx: 0, vy: 0, rot: 0, item: 'NOTHING', name: 'ME', color: '#fff' };
-    const OTHER = { x: 0, y: 0, r: 20, rot: 0, item: 'NOTHING', name: 'OPP', angle: 0, color: '#ff4444' };
+    const ME = { x: 0, y: 0, r: 20, vx: 0, vy: 0, rot: 0, inventory: [], name: 'ME', color: '#fff', swing: 0 };
+    const OTHER = { x: 0, y: 0, r: 20, rot: 0, item: 'NOTHING', name: 'OPP', angle: 0, color: '#ff4444', swing: 0 };
 
-    function resize() {
-        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-        bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
-    }
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight; }
     window.addEventListener('resize', resize); resize();
 
-    // --- MULTIPLAYER ---
+    function randColor() { return `hsl(${Math.random() * 360}, 70%, 60%)`; }
+
     function setupHost() {
         ME.name = document.getElementById('player-name-input').value || "HOST";
         myId = Math.random().toString(36).substr(2, 4).toUpperCase();
         document.getElementById('host-code-display').innerText = myId;
         showMenu('host-lobby');
         peer = new Peer(myId);
-        peer.on('connection', c => {
-            conn = c;
-            document.getElementById('opponent-entry').innerHTML = `2. PLAYER CONNECTED <button class="btn-kick" onclick="kickPlayer()">KICK</button>`;
-            document.getElementById('start-btn').disabled = false;
-            initConn();
-        });
+        peer.on('connection', c => { conn = c; document.getElementById('opponent-entry').innerText = "PLAYER JOINED!"; document.getElementById('start-btn').disabled = false; initConn(); });
         isHost = true;
     }
 
@@ -114,136 +107,236 @@
         ME.name = document.getElementById('player-name-input').value || "GUEST";
         const code = document.getElementById('join-code-input').value.toUpperCase();
         peer = new Peer();
-        peer.on('open', () => {
-            conn = peer.connect(code);
-            conn.on('open', () => initConn());
-        });
-    }
-
-    function kickPlayer() {
-        if(conn) conn.close();
-        document.getElementById('opponent-entry').innerHTML = "";
-        document.getElementById('start-btn').disabled = true;
+        peer.on('open', () => { conn = peer.connect(code); conn.on('open', () => initConn()); });
     }
 
     function initConn() {
         conn.on('data', data => {
             if (data.type === 'START') startGame();
-            if (data.type === 'KICK') { alert("Kicked by Host"); location.reload(); }
             if (data.x !== undefined) {
                 OTHER.x = data.x; OTHER.y = data.y; OTHER.rot = data.rot;
-                OTHER.item = data.item; OTHER.angle = data.angle;
+                OTHER.item = data.item; OTHER.angle = data.angle; OTHER.name = data.name; OTHER.color = data.color; OTHER.swing = data.swing;
             }
-            if (data.type === 'POINT') { scores.me++; updateUI(); }
+            if (data.type === 'HIT') { ME.vx = data.vx; ME.vy = data.vy; }
+            if (data.type === 'DROP') droppedItems.push(data.obj);
+            if (data.type === 'PICKED') droppedItems = droppedItems.filter(i => i.id !== data.id);
+            if (data.type === 'PROJ') projectiles.push(data.obj);
+            if (data.type === 'BEAM') beams.push(data.obj);
+            if (data.type === 'TIME') matchTime = data.val;
         });
-        if(!isHost) showMenu('host-lobby'); // Show lobby for joiner too
+        showMenu('host-lobby');
     }
 
-    function triggerStart() {
-        if (conn) conn.send({ type: 'START' });
-        startGame();
-    }
+    function triggerStart() { if (conn) conn.send({ type: 'START' }); startGame(); }
 
     function startGame() {
         document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none');
         document.getElementById('ui-layer').style.display = 'block';
         canvas.style.display = 'block';
-        isGameRunning = true;
-        ME.x = isHost ? 300 : 700; ME.y = 100;
+        isGameRunning = true; ME.color = randColor();
+        ME.x = isHost ? 200 : 1200; ME.y = 100;
         requestAnimationFrame(gameLoop);
+        if(isHost) setInterval(() => { matchTime--; if(conn) conn.send({type:'TIME', val:matchTime}); }, 1000);
         setInterval(() => {
-            if (conn && conn.open) conn.send({ x: ME.x, y: ME.y, rot: ME.rot, item: ME.item, angle: myAngle });
+            if (conn && conn.open) conn.send({ x: ME.x, y: ME.y, rot: ME.rot, item: ME.inventory[0]?.name || 'NOTHING', angle: myAngle, name: ME.name, color: ME.color, swing: ME.swing });
         }, 20);
     }
 
-    // --- INPUT ---
-    const keys = {};
     window.onkeydown = e => { 
-        keys[e.key.toLowerCase()] = true;
-        if(e.key === ' ' && ME.item !== 'NOTHING') useItem();
+        if(e.key === ' ' && attackTimer <= 0) handleAttack();
         if(e.key === 'e') spinRNG();
+        if(e.key === 'Backspace') dropItem();
+        if(e.key === 'r') tryPickUp();
+        if(e.key === 'Shift' && rollTimer <= 0) roll();
+        if(e.key === '/') { const p = prompt("ADMIN?"); if(p === '15542') document.getElementById('admin-panel').style.display='block'; }
+        keys[e.key.toLowerCase()] = true; 
     };
+    const keys = {};
     window.onkeyup = e => keys[e.key.toLowerCase()] = false;
-    window.onmousemove = e => {
-        const rect = canvas.getBoundingClientRect();
-        mouseX = e.clientX; mouseY = e.clientY;
-        myAngle = Math.atan2(mouseY - ME.y, mouseX - ME.x);
-    };
+    window.onmousemove = e => { mouseX = e.clientX; mouseY = e.clientY; myAngle = Math.atan2(mouseY - ME.y, mouseX - ME.x); };
 
     function spinRNG() {
-        const items = ['SNOWBALL', 'SWORD'];
-        ME.item = items[Math.floor(Math.random() * items.length)];
-        document.getElementById('item-display').innerText = ME.item;
+        if(ME.inventory.length >= 3) return;
+        const items = [
+            { name: 'STICK', ammo: Infinity },
+            { name: 'SWORD', ammo: Infinity },
+            { name: 'SNOWBALL', ammo: 8 },
+            { name: 'NUKE', ammo: 1 },
+            { name: 'LASER', ammo: 3600 } // 60s @ 60fps
+        ];
+        let res = items[Math.floor(Math.random() * items.length)];
+        ME.inventory.push({...res});
+        updateUI();
     }
 
-    function useItem() {
-        if(ME.item === 'SNOWBALL') { /* Projectile logic */ }
-        ME.item = 'NOTHING';
-        document.getElementById('item-display').innerText = "NOTHING";
+    function handleAttack() {
+        const item = ME.inventory[0] || { name: 'FIST', ammo: Infinity };
+        const vx = Math.cos(myAngle), vy = Math.sin(myAngle);
+
+        if (item.name === 'FIST') {
+            ME.swing = 10; attackTimer = 60; // 1s
+            checkMeleeHit(60, 8);
+        } else if (item.name === 'STICK') {
+            ME.swing = 15; attackTimer = 90; // 1.5s
+            checkMeleeHit(80, 15); // 1.5x knockback vs fist
+        } else if (item.name === 'SWORD') {
+            ME.swing = 20; attackTimer = 90; 
+            checkMeleeHit(120, 20); // Big range
+        } else if (item.name === 'SNOWBALL') {
+            projectiles.push({ x: ME.x, y: ME.y, vx: vx * 12, vy: vy * 12, owner: 'ME', type: 'SNOW' });
+            if(conn) conn.send({ type: 'PROJ', obj: { x: ME.x, y: ME.y, vx: vx * 12, vy: vy * 12, owner: 'OTHER', type: 'SNOW' } });
+            item.ammo--;
+        } else if (item.name === 'NUKE') {
+            projectiles.push({ x: ME.x, y: ME.y, vx: vx * 5, vy: vy * 5, owner: 'ME', type: 'NUKE' });
+            if(conn) conn.send({ type: 'PROJ', obj: { x: ME.x, y: ME.y, vx: vx * 5, vy: vy * 5, owner: 'OTHER', type: 'NUKE' } });
+            item.ammo--;
+        } else if (item.name === 'LASER') {
+            beams.push({ sx: ME.x, sy: ME.y, angle: myAngle, owner: 'ME', life: 60 });
+            if(conn) conn.send({ type: 'BEAM', obj: { sx: ME.x, sy: ME.y, angle: myAngle, owner: 'OTHER', life: 60 } });
+            item.ammo -= 60;
+        }
+
+        if (item.ammo <= 0) ME.inventory.shift();
+        updateUI();
     }
 
-    // --- ENGINE ---
+    function checkMeleeHit(range, force) {
+        const d = Math.hypot(OTHER.x - ME.x, OTHER.y - ME.y);
+        const ang = Math.atan2(OTHER.y - ME.y, OTHER.x - ME.x);
+        if (d < range && Math.abs(myAngle - ang) < 1) {
+            if(conn) conn.send({ type: 'HIT', vx: Math.cos(myAngle) * force, vy: -5 });
+        }
+    }
+
+    function dropItem() {
+        if(ME.inventory.length === 0) return;
+        const item = ME.inventory.shift();
+        const obj = { id: Math.random(), ...item, x: ME.x, y: ME.y, timer: 600 };
+        droppedItems.push(obj);
+        if(conn) conn.send({ type: 'DROP', obj });
+        updateUI();
+    }
+
+    function tryPickUp() {
+        const itemIdx = droppedItems.findIndex(i => Math.hypot(i.x - ME.x, i.y - ME.y) < 50);
+        if(itemIdx > -1 && ME.inventory.length < 3) {
+            const item = droppedItems[itemIdx];
+            ME.inventory.push({name: item.name, ammo: item.ammo});
+            droppedItems.splice(itemIdx, 1);
+            if(conn) conn.send({ type: 'PICKED', id: item.id });
+            updateUI();
+        }
+    }
+
+    function roll() { ME.vx = (mouseX > ME.x ? 1 : -1) * 15; rollTimer = 120; }
+
     function update() {
-        if(keys['a']) { ME.vx = -BASE_SPEED; ME.rot -= 0.1; }
-        else if(keys['d']) { ME.vx = BASE_SPEED; ME.rot += 0.1; }
+        if (!isGameRunning) return;
+        if (matchTime <= 0) { isGameRunning = false; alert("Match Over! Winner: " + (scores.me > scores.enemy ? ME.name : OTHER.name)); location.reload(); }
+        
+        if (attackTimer > 0) attackTimer--;
+        if (rollTimer > 0) rollTimer--;
+        if (ME.swing > 0) ME.swing--;
+
+        if (keys['a']) { ME.vx = -4; ME.rot -= 0.1; }
+        else if (keys['d']) { ME.vx = 4; ME.rot += 0.1; }
         else { ME.vx *= 0.8; }
 
-        if(keys['w'] && ME.y + ME.r >= ISLAND_Y && ME.x > ISLAND_X && ME.x < ISLAND_X + ISLAND_W) ME.vy = JUMP;
+        if(!cheatFly) { if(keys['w'] && ME.grounded) ME.vy = -12; ME.vy += 0.6; }
+        else { if(keys['w']) ME.vy = -5; else if(keys['s']) ME.vy = 5; else ME.vy = 0; }
 
-        ME.vy += GRAVITY; ME.x += ME.vx; ME.y += ME.vy;
+        ME.x += ME.vx; ME.y += ME.vy;
+        ME.grounded = false;
+        PLATFORMS.forEach(p => { if (ME.vy >= 0 && ME.y + ME.r > p.y && ME.y + ME.r < p.y + p.h && ME.x > p.x && ME.x < p.x + p.w) { ME.y = p.y - ME.r; ME.vy = 0; ME.grounded = true; } });
 
-        if (ME.y + ME.r > ISLAND_Y && ME.y < ISLAND_Y + 40 && ME.x > ISLAND_X && ME.x < ISLAND_X + ISLAND_W) {
-            if(ME.vy > 0) { ME.y = ISLAND_Y - ME.r; ME.vy = 0; }
-        }
+        droppedItems.forEach((item, i) => { item.timer--; if(item.timer <= 0) droppedItems.splice(i, 1); });
 
-        if (ME.y > canvas.height + 100) {
-            ME.x = 500; ME.y = 100; ME.vx = 0; ME.vy = 0;
-            if(conn) conn.send({type: 'POINT'});
-            scores.enemy++; updateUI();
-        }
+        if (ME.y > LAVA_Y) { ME.x = 200; ME.y = 100; ME.vx = 0; ME.vy = 0; scores.enemy++; updateUI(); if(conn) conn.send({type: 'POINT'}); }
+        
+        projectiles.forEach((p, i) => {
+            p.x += p.vx; p.y += p.vy;
+            if(p.type === 'NUKE') p.vy += 0.1;
+            const d = Math.hypot(p.x - ME.x, p.y - ME.y);
+            if (d < 30 && p.owner === 'OTHER') { ME.vx = p.vx; ME.vy = -10; projectiles.splice(i, 1); }
+            if (p.y > 2000) projectiles.splice(i, 1);
+        });
+
+        beams.forEach((b, i) => { 
+            b.life--; 
+            if(b.owner === 'OTHER') {
+                const angToMe = Math.atan2(ME.y - b.sy, ME.x - b.sx);
+                if(Math.abs(b.angle - angToMe) < 0.1) { ME.vx += Math.cos(b.angle)*2; }
+            }
+            if(b.life <= 0) beams.splice(i, 1); 
+        });
+    }
+
+    function drawPlayer(p, color, isMe) {
+        ctx.save(); ctx.translate(p.x, p.y);
+        ctx.fillStyle="#fff"; ctx.textAlign="center"; ctx.fillText(p.name, 0, -35);
+        ctx.rotate(p.rot); ctx.fillStyle = color;
+        ctx.beginPath(); ctx.arc(0, 0, p.r, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(8,-5,3,0,6.3); ctx.fill(); ctx.beginPath(); ctx.arc(-8,-5,3,0,6.3); ctx.fill();
+        ctx.restore();
+        
+        // Hand & Attack Animation
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(isMe ? myAngle : p.angle);
+        const swingMod = p.swing ? Math.sin(p.swing * 0.5) * 40 : 0;
+        ctx.rotate(swingMod * Math.PI / 180);
+        ctx.fillStyle = color; ctx.beginPath(); ctx.arc(35, 0, 8, 0, 6.3); ctx.fill();
+        
+        // Item Visuals
+        const itm = isMe ? (ME.inventory[0]?.name) : p.item;
+        if(itm === 'SWORD') { ctx.fillStyle = "#ccc"; ctx.fillRect(40, -4, 50, 8); }
+        else if(itm === 'STICK') { ctx.fillStyle = "#8B4513"; ctx.fillRect(40, -3, 40, 6); }
+        ctx.restore();
     }
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // Island
-        ctx.fillStyle = "#4caf50"; ctx.fillRect(ISLAND_X, ISLAND_Y, ISLAND_W, 20);
-        ctx.fillStyle = "#5d4037"; ctx.fillRect(ISLAND_X, ISLAND_Y+20, ISLAND_W, 40);
-
-        // Players
-        [ME, OTHER].forEach(p => {
-            ctx.save();
-            ctx.translate(p.x, p.y);
-            ctx.rotate(p.rot);
-            ctx.fillStyle = p.color;
-            ctx.beginPath(); ctx.arc(0, 0, p.r, 0, Math.PI*2); ctx.fill();
-            // Eyes
-            ctx.fillStyle = "#000";
-            ctx.beginPath(); ctx.arc(8, -5, 3, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.arc(-8, -5, 3, 0, Math.PI*2); ctx.fill();
-            ctx.restore();
+        ctx.fillStyle = "#4caf50"; PLATFORMS.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
+        ctx.fillStyle = "#ff4500"; ctx.fillRect(0, LAVA_Y, canvas.width, 100);
+        
+        droppedItems.forEach(i => { 
+            ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.fillRect(i.x-15, i.y-15, 30, 30); 
+            ctx.fillStyle="#000"; ctx.font="10px Arial"; ctx.fillText(i.name, i.x-12, i.y+5); 
         });
+
+        projectiles.forEach(p => { ctx.fillStyle = p.type==='NUKE'?"#333":"#fff"; ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, 6.3); ctx.fill(); });
+        
+        beams.forEach(b => { 
+            ctx.strokeStyle = "rgba(255,0,0,0.8)"; ctx.lineWidth = 10; ctx.beginPath(); 
+            ctx.moveTo(b.sx, b.sy); ctx.lineTo(b.sx + Math.cos(b.angle)*2000, b.sy + Math.sin(b.angle)*2000); ctx.stroke(); 
+        });
+
+        drawPlayer(ME, ME.color, true); drawPlayer(OTHER, OTHER.color, false);
     }
 
-    function gameLoop() {
-        update(); draw();
-        if(isGameRunning) requestAnimationFrame(gameLoop);
-    }
-
+    function gameLoop() { update(); draw(); if(isGameRunning) requestAnimationFrame(gameLoop); }
+    
     function updateUI() {
         document.getElementById('score-me-display').innerText = `ME: ${scores.me}`;
-        document.getElementById('score-enemy-display').innerText = `OPP: ${scores.enemy}`;
+        document.getElementById('score-enemy-display').innerText = `${OTHER.name}: ${scores.enemy}`;
+        const m = Math.floor(matchTime / 60), s = matchTime % 60;
+        document.getElementById('match-timer').innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+        
+        const nearItem = droppedItems.find(i => Math.hypot(i.x - ME.x, i.y - ME.y) < 50);
+        const promptEl = document.getElementById('pickup-prompt');
+        if(nearItem) { promptEl.style.display = 'block'; document.getElementById('item-name').innerText = nearItem.name; }
+        else promptEl.style.display = 'none';
+
+        for(let i=0; i<3; i++) {
+            const slot = document.getElementById('slot-'+i);
+            const itm = ME.inventory[i];
+            slot.innerHTML = itm ? `${itm.name}<br>${itm.ammo === Infinity ? '' : itm.ammo}` : "EMPTY";
+            slot.className = (i === 0) ? "inv-slot inv-active" : "inv-slot";
+        }
     }
 
-    function showMenu(id) {
-        document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none');
-        document.getElementById(id).style.display = 'block';
-    }
-
-    // --- MENU ANIM ---
+    function showMenu(id) { document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none'); document.getElementById(id).style.display = 'block'; }
     function animParticles() {
         bgCtx.fillStyle = "#000"; bgCtx.fillRect(0,0,bgCanvas.width,bgCanvas.height);
-        bgCtx.fillStyle = "#00d2ff";
-        for(let i=0; i<30; i++) bgCtx.fillRect(Math.random()*bgCanvas.width, Math.random()*bgCanvas.height, 2, 2);
+        bgCtx.fillStyle = "#00d2ff"; for(let i=0; i<30; i++) bgCtx.fillRect(Math.random()*bgCanvas.width, Math.random()*bgCanvas.height, 2, 2);
         if(!isGameRunning) requestAnimationFrame(animParticles);
     }
     animParticles();
