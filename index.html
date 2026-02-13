@@ -3,137 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Platformer</title>
+    <title>Pixel Platformer Online</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Tiny5&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     
     <style>
         body {
-            margin: 0;
-            padding: 0;
-            background-color: #000;
-            color: #fff;
-            font-family: 'Tiny5', sans-serif;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            user-select: none;
+            margin: 0; padding: 0; background-color: #050505; color: #fff;
+            font-family: 'Tiny5', sans-serif; overflow: hidden;
+            display: flex; justify-content: center; align-items: center; height: 100vh;
+            user-select: none; perspective: 1000px;
         }
 
-        /* --- LOADING SCREEN --- */
-        #loading-screen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #000;
-            z-index: 100;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
+        /* --- BACKGROUND PARTICLES --- */
+        #particle-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+        .particle { position: absolute; background: rgba(255, 255, 255, 0.1); opacity: 0; }
+        .triangle { width: 0; height: 0; border-left: 20px solid transparent; border-right: 20px solid transparent; border-bottom: 35px solid rgba(255,255,255,0.1); background: transparent; }
+        @keyframes floatUp { 
+            0% { transform: translateY(110vh) rotate(0deg); opacity: 0; } 
+            20% { opacity: 0.8; } 
+            100% { transform: translateY(-10vh) rotate(360deg); opacity: 0; } 
         }
 
-        .loading-text {
-            font-size: 24px;
-            margin-top: 20px;
-            animation: pulse 1.5s infinite;
-            text-shadow: 0 0 5px #fff;
+        /* --- UI CONTAINERS --- */
+        .menu-screen {
+            position: relative; z-index: 10; text-align: center;
+            display: none; /* Hidden by default */
+            animation: fadeIn 0.5s ease-out;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 40px;
+            border: 2px solid rgba(255,255,255,0.2);
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            backdrop-filter: blur(5px);
         }
 
-        /* --- MAIN MENU --- */
-        #main-menu {
-            text-align: center;
-            display: none; /* Hidden until loaded */
-            z-index: 90;
-            animation: fadeIn 1s ease-in;
-        }
-
+        /* Title Style */
         h1 {
-            font-size: 80px;
-            margin: 0 0 40px 0;
-            color: #fff;
+            font-size: 80px; margin: 0 0 30px 0; color: #fff; line-height: 0.8;
             text-transform: uppercase;
-            /* The Glowing Effect */
-            text-shadow: 
-                0 0 5px #fff,
-                0 0 10px #fff,
-                0 0 20px #fff,
-                0 0 40px #aaaaaa;
+            text-shadow: 0 0 10px #fff, 0 0 20px #aaeeff;
+            transform-style: preserve-3d;
+            animation: titleFloat 4s ease-in-out infinite;
         }
 
+        h2 { font-size: 40px; color: #aaeeff; margin-bottom: 20px; text-shadow: 0 0 10px #aaeeff; }
+        p { font-size: 20px; color: #ccc; }
+
+        /* Button Style */
         .btn {
-            background: transparent;
-            color: #fff;
-            font-family: 'Tiny5', sans-serif;
-            font-size: 30px;
-            padding: 15px 50px;
-            border: 4px solid #fff;
-            cursor: pointer;
+            display: block; width: 300px; margin: 15px auto;
+            background: rgba(0,0,0,0.5); color: #fff;
+            font-family: 'Tiny5', sans-serif; font-size: 24px;
+            padding: 12px; border: 3px solid #fff; cursor: pointer;
             box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
-            transition: all 0.2s;
-            text-transform: uppercase;
+            transition: 0.2s; text-transform: uppercase;
         }
+        .btn:hover { background: #fff; color: #000; box-shadow: 0 0 25px #fff; transform: scale(1.05); }
 
-        .btn:hover {
-            background: #fff;
-            color: #000;
-            box-shadow: 0 0 20px #fff;
-            transform: scale(1.05);
+        /* Inputs */
+        input {
+            background: #222; border: 2px solid #fff; color: #fff;
+            font-family: 'Tiny5', sans-serif; font-size: 24px;
+            padding: 10px; width: 200px; text-align: center;
+            outline: none; margin-bottom: 20px;
         }
+        input:focus { border-color: #00ffcc; box-shadow: 0 0 15px #00ffcc; }
 
-        /* --- GAME CONTAINER --- */
-        #game-container {
-            display: none;
-            position: relative;
-        }
-
-        canvas {
-            border: 2px solid #333;
-            background: #111;
-            box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
+        /* Code Display Box */
+        .code-box {
+            font-size: 40px; color: #00ffcc; border: 2px dashed #00ffcc;
+            padding: 10px; margin: 20px 0; background: rgba(0, 255, 204, 0.1);
+            user-select: text; letter-spacing: 5px;
         }
 
         /* --- ANIMATIONS --- */
-        @keyframes pulse {
-            0% { opacity: 0.5; }
-            50% { opacity: 1; }
-            100% { opacity: 0.5; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        @keyframes titleFloat { 
+            0% { transform: rotateY(-10deg) rotateZ(-2deg); } 
+            50% { transform: rotateY(10deg) rotateZ(2deg); } 
+            100% { transform: rotateY(-10deg) rotateZ(-2deg); } 
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Glowing Rectangles for Loading Background */
-        .glow-rect {
-            position: absolute;
-            background: rgba(255, 255, 255, 0.1);
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
-            animation: floatUp 4s linear infinite;
-        }
-
-        @keyframes floatUp {
-            0% { transform: translateY(100vh) scale(0.5); opacity: 0; }
-            20% { opacity: 0.8; }
-            100% { transform: translateY(-10vh) scale(1.2); opacity: 0; }
-        }
+        /* Game Canvas */
+        #game-container { display: none; }
+        canvas { background: #111; border: 2px solid #555; box-shadow: 0 0 30px rgba(255,255,255,0.1); }
     </style>
 </head>
 <body>
 
-    <div id="loading-screen">
-        <div id="rect-container"></div> <div class="loading-text">INITIALIZING SYSTEM...</div>
+    <div id="particle-container"></div>
+
+    <div id="loading-screen" style="position:fixed; width:100%; height:100%; background:#000; z-index:999; display:flex; justify-content:center; align-items:center; flex-direction:column;">
+        <div style="font-size:30px; animation: pulse 1s infinite; text-shadow:0 0 10px white;">LOADING SYSTEM...</div>
     </div>
 
-    <div id="main-menu">
+    <div id="menu-main" class="menu-screen">
         <h1>Pixel<br>Platformer</h1>
-        <button class="btn" onclick="startGame()">PLAY GAME</button>
+        <button class="btn" onclick="startGame('single')">Single Player</button>
+        <button class="btn" onclick="showScreen('menu-multi')">Multiplayer</button>
+    </div>
+
+    <div id="menu-multi" class="menu-screen">
+        <h2>Multiplayer Mode</h2>
+        <button class="btn" onclick="hostGame()">Host Game</button>
+        <button class="btn" onclick="showScreen('menu-join')">Join Game</button>
+        <br>
+        <button class="btn" onclick="showScreen('menu-main')" style="border-color:#ff5555; font-size: 20px;">Back</button>
+    </div>
+
+    <div id="menu-host" class="menu-screen">
+        <h2>Lobby Created</h2>
+        <p>Share this code with your friend:</p>
+        <div id="my-code" class="code-box">...</div>
+        <p id="host-status">Waiting for player...</p>
+        <button class="btn" onclick="location.reload()" style="border-color:#ff5555;">Cancel</button>
+    </div>
+
+    <div id="menu-join" class="menu-screen">
+        <h2>Join Game</h2>
+        <p>Enter Host Code:</p>
+        <input type="text" id="join-code-input" placeholder="CODE" maxlength="5">
+        <button class="btn" onclick="joinGame()">Connect</button>
+        <button class="btn" onclick="showScreen('menu-multi')" style="border-color:#ff5555; font-size: 20px;">Back</button>
     </div>
 
     <div id="game-container">
@@ -141,58 +133,111 @@
     </div>
 
     <script>
-        // --- LOADING EFFECT ---
-        const rectContainer = document.getElementById('rect-container');
-        
-        function createRect() {
-            const rect = document.createElement('div');
-            rect.classList.add('glow-rect');
-            
-            // Random size and position
-            const size = Math.random() * 50 + 20;
-            rect.style.width = size + 'px';
-            rect.style.height = size + 'px';
-            rect.style.left = Math.random() * 100 + 'vw';
-            rect.style.animationDuration = (Math.random() * 2 + 2) + 's'; // Random speed
-            
-            rectContainer.appendChild(rect);
+        // --- VISUAL FX ---
+        // Floating Particles Logic
+        const pContainer = document.getElementById('particle-container');
+        setInterval(() => {
+            const p = document.createElement('div');
+            p.classList.add('particle');
+            if(Math.random() > 0.5) p.classList.add('triangle');
+            else {
+                p.style.width = (Math.random()*30+10)+'px';
+                p.style.height = (Math.random()*30+10)+'px';
+            }
+            p.style.left = Math.random()*100+'vw';
+            p.style.animation = `floatUp ${Math.random()*3+4}s linear infinite`;
+            pContainer.appendChild(p);
+            setTimeout(() => p.remove(), 7000);
+        }, 200);
 
-            // Remove after animation to prevent lag
-            setTimeout(() => {
-                rect.remove();
-            }, 4000);
-        }
-
-        // Create a new rectangle every 100ms
-        let loadInterval = setInterval(createRect, 100);
-
-        // --- TRANSITION TO MENU ---
+        // Fake Loading Screen
         window.onload = () => {
             setTimeout(() => {
-                clearInterval(loadInterval); // Stop making rectangles
                 document.getElementById('loading-screen').style.display = 'none';
-                document.getElementById('main-menu').style.display = 'block';
-            }, 3000); // 3 second fake load time
+                showScreen('menu-main');
+            }, 1500);
         };
 
-        // --- START GAME ---
-        function startGame() {
-            document.getElementById('main-menu').style.display = 'none';
-            document.getElementById('game-container').style.display = 'block';
-            initGame();
+        function showScreen(id) {
+            document.querySelectorAll('.menu-screen').forEach(s => s.style.display = 'none');
+            document.getElementById(id).style.display = 'block';
         }
 
-        // --- GAME LOGIC (Placeholder) ---
-        function initGame() {
+        // --- MULTIPLAYER LOGIC (PeerJS) ---
+        let peer = null;
+        let conn = null;
+        let isHost = false;
+
+        // Generate a random 4-digit code (simple letters)
+        function generateId() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let result = '';
+            for (let i = 0; i < 4; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+            return result;
+        }
+
+        function hostGame() {
+            showScreen('menu-host');
+            const myID = generateId();
+            document.getElementById('my-code').innerText = myID;
+
+            // Initialize Peer
+            peer = new Peer(myID);
+
+            peer.on('open', (id) => {
+                console.log('My peer ID is: ' + id);
+            });
+
+            // Wait for connection
+            peer.on('connection', (c) => {
+                conn = c;
+                document.getElementById('host-status').innerText = "Player Connected!";
+                document.getElementById('host-status').style.color = "#00ffcc";
+                
+                // Wait 1 second then start game
+                setTimeout(() => {
+                    startGame('multi-host');
+                }, 1000);
+            });
+        }
+
+        function joinGame() {
+            const code = document.getElementById('join-code-input').value.toUpperCase();
+            if(code.length < 4) return alert("Please enter a valid code");
+
+            peer = new Peer(); // Joiners don't need a specific ID
+            
+            peer.on('open', (id) => {
+                conn = peer.connect(code);
+
+                conn.on('open', () => {
+                    console.log("Connected to: " + code);
+                    startGame('multi-client');
+                });
+
+                conn.on('error', (err) => {
+                    alert("Connection Failed. Check Code.");
+                });
+            });
+        }
+
+        // --- GAME ENGINE PLACEHOLDER ---
+        function startGame(mode) {
+            document.querySelectorAll('.menu-screen').forEach(s => s.style.display = 'none');
+            document.getElementById('game-container').style.display = 'block';
+            
             const canvas = document.getElementById('gameCanvas');
             const ctx = canvas.getContext('2d');
             
+            // Just drawing text to prove it worked for now
             ctx.fillStyle = "white";
             ctx.font = "30px Tiny5";
-            ctx.fillText("Game Started!", 300, 250);
+            ctx.fillText("MODE: " + mode.toUpperCase(), 50, 50);
             
-            // This is where we will add the platformer code next!
-            console.log("Game Loop Started");
+            if (mode === 'multi-host') ctx.fillText("You are the HOST", 50, 100);
+            if (mode === 'multi-client') ctx.fillText("You are the CLIENT", 50, 100);
+            
+            // Next step: We will add the actual platformer loop here
         }
     </script>
 </body>
