@@ -3,660 +3,344 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Platformer: Fixed</title>
+    <title>Pixel Platformer: Rolling Chaos</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tiny5&display=swap" rel="stylesheet">
     
     <style>
-        /* --- GLOBAL --- */
         body { margin: 0; background: #111; color: #fff; font-family: 'Tiny5', sans-serif; overflow: hidden; cursor: crosshair; }
-        
-        /* --- PARTICLES (PERMANENT BG) --- */
         #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
+        canvas#gameCanvas { display: none; background: #87CEEB; }
 
-        /* --- GAME CANVAS --- */
-        #gameCanvas { 
-            display: none; 
-            margin: 0 auto; 
-            background: #87CEEB; /* SKY BLUE */
-            border: 4px solid #fff; 
-            position: relative; 
-            z-index: 10; 
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-        }
-
-        /* --- UI ELEMENTS --- */
-        .neon-text { color: #fff; text-shadow: 0 0 10px #00d2ff, 0 0 20px #00d2ff; }
-        
-        /* MENUS */
         .menu-screen { 
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             text-align: center; display: none; z-index: 100; min-width: 400px;
-            background: rgba(0,0,0,0.9); padding: 30px; border: 2px solid #00d2ff; box-shadow: 0 0 20px #00d2ff;
+            background: rgba(0,0,0,0.9); padding: 30px; border: 2px solid #00d2ff;
         }
         #main-menu { display: block; }
-
         .btn { 
             background: #000; color: #fff; border: 2px solid #00d2ff; 
             padding: 15px 30px; font-family: 'Tiny5'; font-size: 24px; cursor: pointer; margin: 10px 0;
-            text-transform: uppercase; transition: 0.2s; display: block; width: 100%;
+            text-transform: uppercase; width: 100%;
         }
-        .btn:hover { background: #00d2ff; color: #000; box-shadow: 0 0 15px #00d2ff; }
-        .btn:disabled { border-color: #555; color: #555; cursor: not-allowed; }
+        .btn:hover { background: #00d2ff; color: #000; }
+        input { background: #000; color: #fff; border: 2px solid #00d2ff; font-family: 'Tiny5'; font-size: 24px; padding: 10px; width: 100%; text-align: center; }
 
-        input { 
-            background: #000; color: #fff; border: 2px solid #00d2ff;
-            font-family: 'Tiny5'; font-size: 24px; padding: 10px; text-align: center; outline: none; width: 100%; margin-bottom: 10px;
-            box-sizing: border-box;
-        }
-
-        /* IN-GAME UI */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; z-index: 20; }
-        
         #scoreboard { position: absolute; top: 20px; right: 20px; text-align: right; }
-        .score-entry { font-size: 24px; color: #fff; text-shadow: 2px 2px 0 #000; margin-bottom: 5px; }
-
-        #power-display { position: absolute; top: 20px; left: 20px; font-size: 20px; color: #ffff00; text-shadow: 2px 2px 0 #000; }
-
-        #rng-box {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(0,0,0,0.6); border: 2px solid #fff; padding: 10px 30px;
-            text-align: center; pointer-events: auto; cursor: pointer;
-        }
-
-        /* ADMIN */
-        #admin-btn {
-            position: absolute; top: 10px; left: 10px;
-            background: transparent; border: 1px solid #333; color: #333;
-            font-family: 'Tiny5'; cursor: pointer; pointer-events: auto;
-            font-size: 12px; padding: 5px;
-        }
-        #admin-btn:hover { border-color: red; color: red; }
-
-        #admin-panel {
-            position: absolute; top: 60px; left: 20px;
-            background: rgba(0,0,0,0.9); border: 2px solid red; padding: 10px;
-            display: none; pointer-events: auto;
-        }
-        .admin-toggle { display: block; margin: 5px 0; color: red; cursor: pointer; font-size: 18px; }
-        .active-cheat { color: #00ff00; }
-        
-        #roll-status {
-            position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
-            color: #00d2ff; font-size: 16px; opacity: 0; transition: opacity 0.2s;
-        }
-        
-        #rare-warning {
-            position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
-            color: #ff00ff; font-size: 20px; text-shadow: 0 0 5px #fff;
-            display: none; animation: flash 0.5s infinite;
-        }
-        @keyframes flash { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
+        #rng-box { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); border: 2px solid #fff; padding: 10px 30px; pointer-events: auto; cursor: pointer; }
     </style>
 </head>
 <body>
-
     <canvas id="bg-canvas"></canvas>
-
+    
     <div id="main-menu" class="menu-screen">
-        <h1 class="neon-text" style="font-size: 60px; margin-bottom: 20px;">PIXEL PLATFORMER</h1>
-        <label style="font-size: 18px; color: #aaa;">ENTER NAME:</label>
-        <input type="text" id="player-name-input" placeholder="Guest" maxlength="10">
-        <button class="btn" onclick="setupHost()">HOST GAME</button>
-        <button class="btn" onclick="showMenu('join-menu')">JOIN GAME</button>
+        <h1 style="font-size: 60px; color: #00d2ff;">PIXEL PLATFORMER</h1>
+        <input type="text" id="player-name-input" placeholder="NAME" maxlength="10">
+        <button class="btn" onclick="setupHost()">HOST</button>
+        <button class="btn" onclick="joinGame()">JOIN</button>
     </div>
 
     <div id="host-room" class="menu-screen">
-        <h2 class="neon-text">LOBBY CREATED</h2>
-        <p style="font-size: 20px; color: #aaa;">SHARE CODE:</p>
-        <div id="host-code" style="font-size: 50px; color: #00ffff; border: 2px dashed #00ffff; margin: 10px 0; padding: 10px;">...</div>
-        <p id="player-status" style="color: #ffff00;">Connecting to Server...</p>
-        <button class="btn" onclick="triggerCountdown()" id="start-btn" disabled>START MATCH</button>
-    </div>
-
-    <div id="join-menu" class="menu-screen">
-        <h2 class="neon-text">JOIN LOBBY</h2>
-        <input type="text" id="join-code" placeholder="CODE" maxlength="4">
-        <button class="btn" onclick="joinGame()">CONNECT</button>
-        <button class="btn" onclick="showMenu('main-menu')" style="background: #333; color: #fff;">BACK</button>
-        <p id="join-status" style="color: #ff4444; margin-top: 10px;"></p>
+        <h2>LOBBY</h2>
+        <div id="host-code" style="font-size: 40px; color: #00ffff; margin: 20px;">...</div>
+        <button class="btn" onclick="triggerCountdown()" id="start-btn" disabled>START</button>
     </div>
 
     <div id="ui-layer">
-        <button id="admin-btn" onclick="promptAdmin()">ADMIN</button>
-        <div id="admin-panel">
-            <div style="color: red; border-bottom: 1px solid red; margin-bottom: 5px;">ADMIN MENU</div>
-            <div class="admin-toggle" id="cheat-fly" onclick="toggleCheat('fly')">[ ] FLY MODE</div>
-            <div class="admin-toggle" id="cheat-luck" onclick="toggleCheat('luck')">[ ] SUPER LUCK</div>
-            <div class="admin-toggle" id="cheat-freeze" onclick="toggleCheat('freeze')">[ ] FREEZE ALL</div>
-        </div>
-
         <div id="scoreboard">
-            <div class="score-entry" id="score-me-display">ME: 0</div>
-            <div class="score-entry" style="color: #ff4444;" id="score-enemy-display">OPP: 0</div>
+            <div id="score-me-display">ME: 0</div>
+            <div id="score-enemy-display" style="color: #ff4444;">OPP: 0</div>
         </div>
-        <div id="power-display">POWER: NONE</div>
-        <div id="roll-status">ROLL COOLDOWN</div>
-        <div id="rare-warning">DON'T REROLL! THIS IS RARE!</div>
-        
         <div id="rng-box" onclick="spinRNG()">
-            <div style="font-size: 12px; color: #fff;">CLICK FOR ITEM</div>
-            <div id="item-display" style="font-size: 24px; color: #fff;">NOTHING</div>
+            <div id="item-display" style="font-size: 24px;">NOTHING</div>
         </div>
     </div>
 
-    <canvas id="gameCanvas" width="1000" height="600"></canvas>
+    <canvas id="gameCanvas"></canvas>
 
 <script>
-    // --- 0. PARTICLES (ALWAYS ON) ---
-    const bgCanvas = document.getElementById('bg-canvas');
-    const bgCtx = bgCanvas.getContext('2d');
-    let particles = [];
-    function resizeBg() { bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight; }
-    window.addEventListener('resize', resizeBg); resizeBg();
-
-    class Particle {
-        constructor() {
-            this.x = Math.random() * bgCanvas.width; this.y = Math.random() * bgCanvas.height;
-            this.size = Math.random() * 2 + 1; 
-            this.speedX = Math.random() * 0.5 - 0.25; this.speedY = Math.random() * 0.5 - 0.25;
-            this.alpha = Math.random();
-        }
-        update() {
-            this.x += this.speedX; this.y += this.speedY;
-            if (this.x < 0) this.x = bgCanvas.width; if (this.x > bgCanvas.width) this.x = 0;
-            if (this.y < 0) this.y = bgCanvas.height; if (this.y > bgCanvas.height) this.y = 0;
-        }
-        draw() {
-            bgCtx.fillStyle = `rgba(0, 210, 255, ${this.alpha})`;
-            bgCtx.beginPath(); bgCtx.arc(this.x, this.y, this.size, 0, Math.PI*2); bgCtx.fill();
-        }
-    }
-    for(let i=0; i<60; i++) particles.push(new Particle());
-    
-    function animateBg() {
-        bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
-        // We do NOT fill rect here, letting CSS background-color show through
-        particles.forEach(p => { p.update(); p.draw(); });
-        requestAnimationFrame(animateBg);
-    }
-    animateBg();
-
-    // --- 1. CONFIG ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    
-    const ISLAND_Y = 400; 
-    const ISLAND_X = 200; 
-    const ISLAND_W = 600; 
-    
-    const GRAVITY = 0.8;
-    const JUMP_FORCE = -15; 
-    const BASE_SPEED = 1.0; // REEEAAALLY SLOW
+    const bgCanvas = document.getElementById('bg-canvas');
+    const bgCtx = bgCanvas.getContext('2d');
 
-    // STATE
-    let myId = null;
-    let peer = null;
-    let conn = null;
-    let isHost = false;
-    let isGameRunning = false;
-    let canMove = false;
-    let projectiles = [];
-    let beams = []; 
-    let scores = { me: 0, enemy: 0 };
+    // --- MAP DATA ---
+    const MAP = {
+        islands: [
+            { x: 100, y: 500, w: 400, h: 40 },
+            { x: 700, y: 500, w: 400, h: 40 },
+            { x: 400, y: 300, w: 400, h: 40 },
+            { x: 1000, y: 250, w: 300, h: 40 }
+        ],
+        ladders: [
+            { x: 450, y: 300, w: 40, h: 200 },
+            { x: 710, y: 300, w: 40, h: 200 }
+        ]
+    };
+
+    // --- PHYSICS & CONSTANTS ---
+    const GRAVITY = 0.6;
+    const JUMP = -12;
+    const ACCEL = 0.5;
+    const FRICTION = 0.92;
+    const MAX_SPEED = 6;
+
+    let isGameRunning = false, isHost = false, conn, peer, myId;
     let mouseX = 0, mouseY = 0, myAngle = 0;
-    
-    let isAdmin = false;
-    let cheatFly = false;
-    let cheatLuck = false;
-    let globalFreeze = false;
+    let projectiles = [], beams = [], scores = { me: 0, enemy: 0 };
+    let lastHitter = null; // Tracks who hit who for kill credit
 
-    const ME = { 
-        x: 300, y: 200, w: 40, h: 40, vx: 0, vy: 0, 
-        item: 'NOTHING', power: 'NONE', name: 'Guest', 
-        color: '#fff', facingRight: true, meleeCooldown: 0,
-        rollCooldown: 0
-    };
-    
-    const OTHER = { 
-        x: 700, y: 200, w: 40, h: 40, item: 'NOTHING', 
-        name: 'Enemy', angle: 0, color: '#ff4444' 
-    };
+    const ME = { x: 0, y: 0, r: 20, vx: 0, vy: 0, rot: 0, item: 'NOTHING', name: 'ME', color: '#fff', onLadder: false };
+    const OTHER = { x: 0, y: 0, r: 20, rot: 0, item: 'NOTHING', name: 'OPP', angle: 0, color: '#ff4444' };
 
-    const POWERS = {
-        'NONE': { color: '#fff', desc: 'No Power' },
-        'FAST': { color: '#00ff00', desc: 'Speed +' },
-        'STRONG': { color: '#ff0000', desc: 'Knockback +' },
-        'SMALL': { color: '#ff00ff', desc: 'Tiny Hitbox' },
-        'TANK': { color: '#0000ff', desc: 'Heavy' }
-    };
-
-    // --- ADMIN ---
-    function promptAdmin() {
-        const code = prompt("ENTER ADMIN KEY:");
-        if (code === "15542") {
-            isAdmin = true;
-            document.getElementById('admin-panel').style.display = 'block';
-            document.getElementById('admin-btn').style.display = 'none';
-        } else {
-            alert("ACCESS DENIED");
-        }
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        bgCanvas.width = window.innerWidth;
+        bgCanvas.height = window.innerHeight;
     }
-    function toggleCheat(type) {
-        if (!isAdmin) return;
-        const el = document.getElementById('cheat-' + type);
-        if (type === 'fly') {
-            cheatFly = !cheatFly;
-            el.innerText = cheatFly ? "[X] FLY MODE" : "[ ] FLY MODE";
-            el.className = cheatFly ? "admin-toggle active-cheat" : "admin-toggle";
-            ME.vy = 0; 
-        }
-        if (type === 'luck') {
-            cheatLuck = !cheatLuck;
-            el.innerText = cheatLuck ? "[X] SUPER LUCK" : "[ ] SUPER LUCK";
-            el.className = cheatLuck ? "admin-toggle active-cheat" : "admin-toggle";
-        }
-        if (type === 'freeze') {
-            globalFreeze = !globalFreeze;
-            el.innerText = globalFreeze ? "[X] FREEZE ALL" : "[ ] FREEZE ALL";
-            el.className = globalFreeze ? "admin-toggle active-cheat" : "admin-toggle";
-            if(conn) conn.send({ type: 'ADMIN_FREEZE', state: globalFreeze });
-        }
-    }
+    window.addEventListener('resize', resize);
+    resize();
 
-    // --- INPUT ---
-    document.addEventListener('mousemove', e => {
-        const rect = canvas.getBoundingClientRect();
-        mouseX = e.clientX - rect.left;
-        mouseY = e.clientY - rect.top;
-        if(isGameRunning) myAngle = Math.atan2(mouseY - (ME.y + ME.h/2), mouseX - (ME.x + ME.w/2));
-    });
-
-    // --- MENUS ---
-    function showMenu(id) {
-        document.querySelectorAll('.menu-screen').forEach(el => el.style.display = 'none');
-        document.getElementById(id).style.display = 'block';
-    }
-    function generateId() { return Math.random().toString(36).substr(2, 4).toUpperCase(); }
-
+    // --- NETWORKING ---
     function setupHost() {
         ME.name = document.getElementById('player-name-input').value || "HOST";
-        showMenu('host-room');
-        myId = generateId();
+        myId = Math.random().toString(36).substr(2, 4).toUpperCase();
         document.getElementById('host-code').innerText = myId;
-        document.getElementById('player-status').innerText = "Registering Server...";
-
+        showMenu('host-room');
         peer = new Peer(myId);
-        
-        peer.on('open', (id) => {
-            document.getElementById('player-status').innerText = "Waiting for player...";
-        });
-        
-        peer.on('error', (err) => {
-            alert("Hosting Error: " + err.type);
-            location.reload();
-        });
-
-        peer.on('connection', (c) => {
+        peer.on('connection', c => {
             conn = c;
-            initConnection();
-            document.getElementById('player-status').innerText = "PLAYER CONNECTED!";
             document.getElementById('start-btn').disabled = false;
+            initConn();
         });
         isHost = true;
     }
 
     function joinGame() {
         ME.name = document.getElementById('player-name-input').value || "GUEST";
-        const code = document.getElementById('join-code').value.toUpperCase();
-        if(code.length !== 4) return;
-        
-        document.getElementById('join-status').innerText = "Connecting...";
-        
-        peer = new Peer(); // No ID needed for joiner
-        
-        peer.on('open', (id) => {
+        const code = prompt("ENTER CODE:");
+        peer = new Peer();
+        peer.on('open', () => {
             conn = peer.connect(code);
-            conn.on('open', () => {
-                document.getElementById('join-status').innerText = "Connected! Waiting for host...";
-                initConnection();
-            });
-            conn.on('error', (err) => {
-                alert("Connection Failed: " + err.type);
-            });
-            // Keep alive
-            setInterval(() => { if(conn.open) conn.send({type:'PING'}); }, 1000);
+            conn.on('open', () => initConn());
         });
-        
-        peer.on('error', (err) => {
-             document.getElementById('join-status').innerText = "Error: " + err.type;
-        });
-        isHost = false;
     }
 
-    // --- GAME LOGIC ---
-    function triggerCountdown() {
-        if(conn) conn.send({ type: 'START_GAME' });
-        startGameSequence();
-    }
-
-    function startGameSequence() {
-        document.querySelectorAll('.menu-screen').forEach(el => el.style.display = 'none');
-        document.getElementById('ui-layer').style.display = 'block';
-        canvas.style.display = 'block';
-        
-        document.getElementById('score-me-display').innerText = ME.name + ": 0";
-        document.getElementById('score-enemy-display').innerText = OTHER.name + ": 0";
-
-        const pKeys = Object.keys(POWERS).filter(k => k !== 'NONE');
-        ME.power = pKeys[Math.floor(Math.random() * pKeys.length)];
-        applyPowerStats();
-        
-        respawn();
-        isGameRunning = true;
-        canMove = true;
-        gameLoop(); 
-        setInterval(sendData, 20);
-    }
-
-    function respawn() {
-        ME.x = ISLAND_X + Math.random() * (ISLAND_W - 50);
-        ME.y = ISLAND_Y - 200;
-        ME.vx = 0; ME.vy = 0;
-    }
-
-    function applyPowerStats() {
-        const p = POWERS[ME.power];
-        document.getElementById('power-display').innerText = `POWER: ${ME.power} (${p.desc})`;
-        document.getElementById('power-display').style.color = p.color;
-        ME.w = 40; ME.h = 40;
-        if (ME.power === 'SMALL') { ME.w = 25; ME.h = 25; }
-        if (ME.power === 'TANK') { ME.w = 50; ME.h = 50; }
-    }
-
-    // --- NETWORK ---
-    function initConnection() {
-        conn.on('data', (data) => {
-            if (data.type === 'START_GAME') startGameSequence();
-            
+    function initConn() {
+        conn.on('data', data => {
+            if (data.type === 'START') startGame();
             if (data.x !== undefined) {
-                OTHER.x = data.x; OTHER.y = data.y; OTHER.item = data.item; 
-                OTHER.angle = data.angle; OTHER.name = data.name;
-                if(data.power === 'SMALL') { OTHER.w = 25; OTHER.h = 25; }
-                else if(data.power === 'TANK') { OTHER.w = 50; OTHER.h = 50; }
-                else { OTHER.w = 40; OTHER.h = 40; }
-                
-                if(document.getElementById('score-enemy-display').innerText.includes('OPP')) {
-                    document.getElementById('score-enemy-display').innerText = OTHER.name + ": " + scores.enemy;
-                }
+                OTHER.x = data.x; OTHER.y = data.y; OTHER.rot = data.rot;
+                OTHER.item = data.item; OTHER.angle = data.angle;
             }
-            if (data.type === 'HIT') applyHit(ME, data.force, data.vx, data.vy);
-            if (data.type === 'TELEPORT_OUT') { ME.y = 1500; } 
-            if (data.type === 'DEATH') { scores.me++; updateScore(); }
+            if (data.type === 'HIT') {
+                ME.vx = data.vx; ME.vy = data.vy;
+                lastHitter = "OTHER";
+            }
             if (data.type === 'PROJ') projectiles.push(data.obj);
             if (data.type === 'BEAM') beams.push(data.obj);
-            if (data.type === 'ADMIN_FREEZE') globalFreeze = data.state;
+            if (data.type === 'POINT') { scores.me++; updateUI(); }
         });
     }
 
-    function sendData() {
-        if(conn && conn.open) {
-            conn.send({ x: ME.x, y: ME.y, item: ME.item, angle: myAngle, name: ME.name, power: ME.power });
-        }
+    function startGame() {
+        if (isHost && conn) conn.send({ type: 'START' });
+        document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none');
+        document.getElementById('ui-layer').style.display = 'block';
+        canvas.style.display = 'block';
+        isGameRunning = true;
+        ME.x = isHost ? 200 : 800;
+        ME.y = 100;
+        requestAnimationFrame(gameLoop);
+        setInterval(() => {
+            if (conn && conn.open) conn.send({ x: ME.x, y: ME.y, rot: ME.rot, item: ME.item, angle: myAngle });
+        }, 20);
     }
 
-    // --- UPDATE LOOP ---
+    // --- CONTROLS ---
+    const keys = {};
+    window.onkeydown = e => keys[e.key.toLowerCase()] = true;
+    window.onkeyup = e => keys[e.key.toLowerCase()] = false;
+    window.onmousemove = e => {
+        mouseX = e.clientX; mouseY = e.clientY;
+        myAngle = Math.atan2(mouseY - ME.y, mouseX - ME.x);
+    };
+    window.onmousedown = () => { if (ME.item !== 'NOTHING') useItem(); };
+
+    function useItem() {
+        const vx = Math.cos(myAngle), vy = Math.sin(myAngle);
+        if (ME.item === 'SNOWBALL') {
+            const obj = { x: ME.x, y: ME.y, vx: vx * 10, vy: vy * 10, owner: 'ME', type: 'SNOW' };
+            projectiles.push(obj);
+            conn.send({ type: 'PROJ', obj: { ...obj, owner: 'OTHER' } });
+        }
+        if (ME.item === 'LASER') {
+            const obj = { x: ME.x, y: ME.y, angle: myAngle, owner: 'ME', life: 30 };
+            beams.push(obj);
+            conn.send({ type: 'BEAM', obj: { ...obj, owner: 'OTHER' } });
+        }
+        ME.item = 'NOTHING';
+        document.getElementById('item-display').innerText = "NOTHING";
+    }
+
+    // --- GAME ENGINE ---
     function update() {
-        if (!isGameRunning) return;
-        if (globalFreeze && !isAdmin) return;
+        // Horizontal
+        if (keys['a']) ME.vx -= ACCEL;
+        if (keys['d']) ME.vx += ACCEL;
+        ME.vx *= FRICTION;
+        ME.rot += ME.vx * 0.05;
 
-        // PLAYER MOVEMENT
-        let spd = BASE_SPEED;
-        if (ME.power === 'FAST') spd *= 1.5;
-        if (ME.power === 'TANK') spd *= 0.8;
+        // Ladder & Vertical
+        let touchingLadder = false;
+        MAP.ladders.forEach(l => {
+            if (ME.x > l.x && ME.x < l.x + l.w && ME.y > l.y && ME.y < l.y + l.h) touchingLadder = true;
+        });
 
-        if (keys['a']) ME.vx = -spd;
-        else if (keys['d']) ME.vx = spd;
-        else ME.vx *= 0.8; 
-
-        if (cheatFly) {
-            if (keys['w']) ME.vy = -spd; else if (keys['s']) ME.vy = spd; else ME.vy = 0;
+        if (touchingLadder) {
+            if (keys['w']) ME.vy = -4;
+            else if (keys['s']) ME.vy = 4;
+            else ME.vy *= 0.8;
         } else {
-            if (keys['w'] && onGround(ME)) ME.vy = JUMP_FORCE;
-            ME.vy += GRAVITY; 
+            ME.vy += GRAVITY;
+            if (keys['w'] && ME.grounded) ME.vy = JUMP;
         }
 
-        // ROLL
-        if (ME.rollCooldown > 0) {
-            ME.rollCooldown--;
-            document.getElementById('roll-status').style.opacity = '1';
-        } else {
-            document.getElementById('roll-status').style.opacity = '0';
-        }
+        ME.x += ME.vx;
+        ME.y += ME.vy;
 
-        if (keys['shift'] && ME.rollCooldown <= 0 && !cheatFly) {
-            const dir = ME.facingRight ? 1 : -1;
-            ME.vx = dir * 10; 
-            ME.rollCooldown = 90; 
-        }
-
-        ME.x += ME.vx; ME.y += ME.vy;
-        if (mouseX > ME.x) ME.facingRight = true; else ME.facingRight = false;
-
-        // ISLAND COLLISION
-        if (ME.vy >= 0 && !cheatFly) {
-            if (ME.y + ME.h >= ISLAND_Y && ME.y + ME.h <= ISLAND_Y + 30) {
-                if (ME.x + ME.w > ISLAND_X && ME.x < ISLAND_X + ISLAND_W) {
-                    ME.y = ISLAND_Y - ME.h; ME.vy = 0;
+        // Collision
+        ME.grounded = false;
+        MAP.islands.forEach(i => {
+            if (ME.x > i.x && ME.x < i.x + i.w && ME.y + ME.r > i.y && ME.y - ME.r < i.y + i.h) {
+                if (ME.vy > 0) {
+                    ME.y = i.y - ME.r;
+                    ME.vy = 0;
+                    ME.grounded = true;
                 }
             }
-        }
+        });
 
-        // VOID
-        if (ME.y > canvas.height + 200) {
-            respawn(); scores.enemy++; updateScore();
-            if(conn) conn.send({type: 'DEATH'});
-        }
-
-        // --- MELEE COLLISION ---
-        if (ME.meleeCooldown > 0) ME.meleeCooldown--;
-        const isMelee = (ME.item === 'NOTHING' || ME.item === 'SWORD' || ME.item === 'STICK');
-        
-        if (isMelee && ME.meleeCooldown <= 0) {
-            if (checkRectOverlap(ME.x, ME.y, ME.w, ME.h, OTHER)) {
-                const dx = OTHER.x - ME.x; const dy = OTHER.y - ME.y;
-                const angleToEnemy = Math.atan2(dy, dx);
-                if (Math.abs(myAngle - angleToEnemy) < 1.0) {
-                    let force = 10;
-                    if (ME.item === 'SWORD') force = 25;
-                    if (ME.item === 'STICK') force = 15;
-                    if (ME.power === 'STRONG') force *= 1.5;
-                    sendHit(force, Math.cos(myAngle)*force, -5);
-                    ME.meleeCooldown = 30;
-                }
+        // Void / Scoring
+        if (ME.y > canvas.height + 100) {
+            if (lastHitter === "OTHER") {
+                conn.send({ type: 'POINT' });
+                scores.enemy++;
             }
+            ME.x = 400; ME.y = 100; ME.vx = 0; ME.vy = 0;
+            lastHitter = null;
+            updateUI();
         }
 
-        // PROJECTILES
+        // Projectiles
         projectiles.forEach((p, i) => {
             p.x += p.vx; p.y += p.vy;
-            let target = (p.owner === 'ME') ? OTHER : ME;
-            if (p.owner !== 'ME' && checkRectOverlap(p.x, p.y, p.size, p.size, target)) {
-                if(p.type === 'NUKE') applyHit(ME, 100, p.vx * 10, -30);
-                else applyHit(ME, 10, p.vx * 2, -5);
+            const d = Math.hypot(p.x - ME.x, p.y - ME.y);
+            if (d < ME.r + 5 && p.owner === 'OTHER') {
+                ME.vx = p.vx; ME.vy = -5;
+                lastHitter = "OTHER";
                 projectiles.splice(i, 1);
             }
-            if (p.y > 1000 || p.x < -1000 || p.x > 2000) projectiles.splice(i, 1);
         });
 
-        // BEAMS
+        // Laser Knockback (Fixed)
         beams.forEach((b, i) => {
             b.life--;
-            if (b.owner !== 'ME') {
-                const dx = ME.x - b.sx; const dy = ME.y - b.sy;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                const angleToMe = Math.atan2(dy, dx);
-                if (dist < 1200 && Math.abs(b.angle - angleToMe) < 0.1) {
-                    applyHit(ME, 2, Math.cos(b.angle)*2, Math.sin(b.angle)*2);
+            if (b.owner === 'OTHER') {
+                const angleToMe = Math.atan2(ME.y - b.x, ME.x - b.x);
+                if (Math.abs(b.angle - angleToMe) < 0.15) {
+                    ME.vx += Math.cos(b.angle) * 2;
+                    ME.vy += Math.sin(b.angle) * 0.5;
+                    lastHitter = "OTHER";
                 }
             }
             if (b.life <= 0) beams.splice(i, 1);
         });
     }
 
-    function onGround(p) {
-        return (p.y + p.h === ISLAND_Y && p.x + p.w > ISLAND_X && p.x < ISLAND_X + ISLAND_W);
-    }
-
-    // --- DRAW ---
-    function draw() {
-        ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // ISLAND
-        ctx.fillStyle = '#4caf50'; ctx.fillRect(ISLAND_X, ISLAND_Y, ISLAND_W, 20);
-        ctx.fillStyle = '#5d4037'; ctx.fillRect(ISLAND_X + 10, ISLAND_Y + 20, ISLAND_W - 20, 50);
-
-        // Projectiles
-        projectiles.forEach(p => {
-            ctx.fillStyle = p.color;
-            ctx.beginPath(); ctx.arc(p.x, p.y, p.size/2, 0, Math.PI*2); ctx.fill();
-        });
-
-        // Beams
-        beams.forEach(b => {
-            ctx.strokeStyle = 'red'; ctx.lineWidth = 4;
-            ctx.beginPath(); ctx.moveTo(b.sx, b.sy);
-            ctx.lineTo(b.sx + Math.cos(b.angle)*1200, b.sy + Math.sin(b.angle)*1200);
-            ctx.stroke();
-        });
-
-        drawPlayer(ME, ME.color, true);
-        drawPlayer(OTHER, OTHER.color, false);
-    }
-
-    function drawPlayer(p, color, isMe) {
-        ctx.fillStyle = '#fff'; ctx.font = '14px "Tiny5"'; ctx.textAlign = 'center';
-        ctx.fillText(p.name, p.x + p.w/2, p.y - 15);
-
-        ctx.fillStyle = color; ctx.fillRect(p.x, p.y, p.w, p.h);
-
-        // HAND
+    function drawPlayer(p, color) {
         ctx.save();
-        ctx.translate(p.x + p.w/2, p.y + p.h/2);
-        let angle = isMe ? myAngle : p.angle;
-        
-        const handDist = 35;
-        ctx.translate(Math.cos(angle)*handDist, Math.sin(angle)*handDist);
-        ctx.rotate(angle);
-        
-        ctx.fillStyle = color; ctx.fillRect(-6, -6, 12, 12);
-        
-        // BIGGER MELEE ITEMS
-        if (p.item === 'SWORD') {
-            ctx.fillStyle = '#ccc'; ctx.fillRect(0, -3, 80, 6); // Longer and thicker
-            ctx.fillStyle = '#8B4513'; ctx.fillRect(-10, -3, 20, 6);
-        } else if (p.item === 'STICK') {
-            ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 5; 
-            ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(60,0); ctx.stroke(); // Longer
-        } else if (p.item === 'SNOWBALL') {
-            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(5, 0, 6, 0, Math.PI*2); ctx.fill();
-        } else if (p.item === 'NUKE') {
-            ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(5, 0, 8, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#ff0'; ctx.font = '10px Arial'; ctx.fillText('☢', 5, 3);
-        } else if (p.item === 'TELEPORTER') {
-            ctx.fillStyle = '#0ff'; ctx.fillRect(0, -5, 15, 10);
-        } else if (p.item === 'LASER') {
-            ctx.fillStyle = '#f00'; ctx.fillRect(0, -4, 20, 8);
-        }
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        // Body
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.arc(0, 0, p.r, 0, Math.PI * 2); ctx.fill();
+        // Face
+        ctx.fillStyle = "#000";
+        ctx.beginPath(); ctx.arc(8, -5, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-8, -5, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillRect(-10, 5, 20, 2);
         ctx.restore();
-    }
 
-    // --- INPUT (RANGED) ---
-    const keys = {};
-    window.addEventListener('keydown', e => {
-        keys[e.key.toLowerCase()] = true;
-        if (e.key === ' ' && canMove) useRangedItem(); 
-        if (e.key === 'e') spinRNG();
-    });
-    window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-
-    function useRangedItem() {
-        if (ME.item === 'NOTHING' || ME.item === 'SWORD' || ME.item === 'STICK') return;
-
-        const vx = Math.cos(myAngle);
-        const vy = Math.sin(myAngle);
-
-        if (ME.item === 'SNOWBALL' || ME.item === 'NUKE') {
-            const isNuke = ME.item === 'NUKE';
-            const spd = isNuke ? 8 : 12;
-            const size = isNuke ? 20 : 10;
-            const color = isNuke ? '#000' : '#fff';
-            const p = { x: ME.x+20, y: ME.y+20, vx: vx*spd, vy: vy*spd, owner: 'ME', type: isNuke?'NUKE':'SNOWBALL', size: size, color: color };
-            projectiles.push(p);
-            if(conn) conn.send({type: 'PROJ', obj: Object.assign({}, p, {owner:'OTHER'}) });
-            ME.item = 'NOTHING'; updateUI();
-        }
-        else if (ME.item === 'TELEPORTER') {
-            if(conn) conn.send({ type: 'TELEPORT_OUT' });
-            ME.item = 'NOTHING'; updateUI();
-        }
-        else if (ME.item === 'LASER') {
-            const b = { sx: ME.x+20, sy: ME.y+20, angle: myAngle, life: 60, owner: 'ME' };
-            beams.push(b);
-            if(conn) conn.send({type: 'BEAM', obj: Object.assign({}, b, {owner:'OTHER'})});
-            ME.item = 'NOTHING'; updateUI();
+        // Item Hand
+        if (p === ME) {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(myAngle);
+            ctx.fillStyle = color;
+            ctx.fillRect(25, -5, 10, 10);
+            ctx.restore();
         }
     }
 
-    function checkRectOverlap(x, y, w, h, target) {
-        return (x < target.x + target.w && x + w > target.x && y < target.y + target.h && y + h > target.y);
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Islands
+        ctx.fillStyle = "#4caf50";
+        MAP.islands.forEach(i => ctx.fillRect(i.x, i.y, i.w, i.h));
+        // Ladders
+        ctx.fillStyle = "#8B4513";
+        MAP.ladders.forEach(l => {
+            for(let j=0; j<l.h; j+=20) ctx.fillRect(l.x, l.y+j, l.w, 4);
+            ctx.fillRect(l.x, l.y, 4, l.h);
+            ctx.fillRect(l.x + l.w - 4, l.y, 4, l.h);
+        });
+        // Effects
+        beams.forEach(b => {
+            ctx.strokeStyle = "red"; ctx.lineWidth = 10;
+            ctx.beginPath(); ctx.moveTo(b.x, b.y);
+            ctx.lineTo(b.x + Math.cos(b.angle) * 2000, b.y + Math.sin(b.angle) * 2000); ctx.stroke();
+        });
+        projectiles.forEach(p => {
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI*2); ctx.fill();
+        });
+
+        drawPlayer(ME, ME.color);
+        drawPlayer(OTHER, OTHER.color);
     }
 
-    function sendHit(force, vx, vy) { if(conn) conn.send({ type: 'HIT', force: force, vx: vx, vy: vy }); }
-    function applyHit(p, force, vx, vy) { p.vx = vx; p.vy = vy; }
+    function gameLoop() {
+        update();
+        draw();
+        if (isGameRunning) requestAnimationFrame(gameLoop);
+    }
 
-    // --- RNG ---
     function spinRNG() {
-        let items = ['SWORD', 'STICK', 'SNOWBALL'];
-        let i = 0;
-        let t = setInterval(() => {
-            document.getElementById('item-display').innerText = items[i % items.length];
-            i++;
-            if(i>10) {
-                clearInterval(t);
-                let r = Math.random() * 1000;
-                if (cheatLuck) r = 0; // ADMIN LUCK
-                
-                let newItem = 'NOTHING';
-                if (r <= 1) newItem = 'LASER';
-                else if (r <= 3) newItem = 'TELEPORTER';
-                else if (r <= 13) newItem = 'NUKE';
-                else {
-                    const c = Math.random();
-                    if(c < 0.4) newItem = 'STICK';
-                    else if (c < 0.7) newItem = 'SNOWBALL';
-                    else newItem = 'SWORD';
-                }
-                ME.item = newItem;
-                updateUI();
-            }
-        }, 50);
-    }
-    
-    function updateUI() { 
+        const items = ['SNOWBALL', 'LASER'];
+        ME.item = items[Math.floor(Math.random() * items.length)];
         document.getElementById('item-display').innerText = ME.item;
-        const isRare = ['NUKE', 'TELEPORTER', 'LASER'].includes(ME.item);
-        document.getElementById('rare-warning').style.display = isRare ? 'block' : 'none';
-        document.getElementById('item-display').style.color = isRare ? '#ff00ff' : '#fff';
     }
 
-    function updateScore() { 
-        document.getElementById('score-me-display').innerText = ME.name + ": " + scores.me; 
-        document.getElementById('score-enemy-display').innerText = OTHER.name + ": " + scores.enemy; 
+    function updateUI() {
+        document.getElementById('score-me-display').innerText = `ME: ${scores.me}`;
+        document.getElementById('score-enemy-display').innerText = `OPP: ${scores.enemy}`;
     }
 
-    function gameLoop() { if(isGameRunning) { update(); draw(); requestAnimationFrame(gameLoop); } }
+    function showMenu(id) {
+        document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none');
+        document.getElementById(id).style.display = 'block';
+    }
 
+    // --- MENU PARTICLES ---
+    function animParticles() {
+        bgCtx.fillStyle = "#000"; bgCtx.fillRect(0,0,bgCanvas.width,bgCanvas.height);
+        bgCtx.fillStyle = "#00d2ff";
+        for(let i=0; i<30; i++) bgCtx.fillRect(Math.random()*bgCanvas.width, Math.random()*bgCanvas.height, 2, 2);
+        if(!isGameRunning) requestAnimationFrame(animParticles);
+    }
+    animParticles();
 </script>
 </body>
 </html>
