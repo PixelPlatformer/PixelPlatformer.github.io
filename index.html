@@ -3,158 +3,160 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Platformer: Chaos Edition</title>
+    <title>Pixel Platformer: Chaos Lobby</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tiny5&display=swap" rel="stylesheet">
     
     <style>
-        body { margin: 0; background: #111; color: #fff; font-family: 'Tiny5', sans-serif; overflow: hidden; }
-        canvas { display: block; margin: 0 auto; background: #222; border: 2px solid #555; }
+        /* --- GLOBAL & RESET --- */
+        body { 
+            margin: 0; 
+            background: #000; /* Pure Black Background */
+            color: #fff; 
+            font-family: 'Tiny5', sans-serif; 
+            overflow: hidden; 
+        }
+        canvas { display: block; margin: 0 auto; background: #111; border: 2px solid #333; }
         
-        /* --- LOADING SCREEN CSS (ADDED) --- */
+        /* --- GLOWING TEXT UTILITY --- */
+        .neon-text {
+            color: #fff;
+            text-shadow: 0 0 5px #fff, 0 0 10px #00d2ff, 0 0 20px #00d2ff;
+        }
+        
+        /* --- LOADING SCREEN --- */
         #loading-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #1a1a1a;
-            z-index: 9999; /* Sits on top of everything */
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #000;
+            z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
             transition: opacity 0.5s ease;
         }
 
-        /* The Spinner Container */
-        .loader-box {
-            position: relative;
-            width: 100px;
-            height: 100px;
-            margin-bottom: 20px;
-        }
-
-        /* The Invisible Rotating Spans */
+        .loader-box { position: relative; width: 100px; height: 100px; margin-bottom: 20px; }
         .loader-box span {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             transform: rotate(calc(30deg * var(--i)));
         }
-
-        /* The Visible Squares */
         .loader-box span::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 15px;
-            height: 15px;
-            background: #00d2ff; /* Cyan Color */
-            box-shadow: 0 0 10px #00d2ff, 0 0 20px #00d2ff; /* Glow Effect */
-            opacity: 0;
-            animation: fadeSquare 1s linear infinite;
+            content: ''; position: absolute; top: 0; left: 0; width: 15px; height: 15px;
+            background: #00d2ff; box-shadow: 0 0 10px #00d2ff, 0 0 20px #00d2ff;
+            opacity: 0; animation: fadeSquare 1s linear infinite;
             animation-delay: calc(1s / 12 * var(--i));
         }
-
         @keyframes fadeSquare {
-            0% { opacity: 1; transform: scale(1.2); }
-            80%, 100% { opacity: 0; transform: scale(1); }
+            0% { opacity: 1; transform: scale(1.2); } 80%, 100% { opacity: 0; transform: scale(1); }
+        }
+        .loader-hidden { opacity: 0; pointer-events: none; }
+
+
+        /* --- MENUS --- */
+        .menu-screen { 
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95); padding: 40px; 
+            border: 2px solid #00d2ff; box-shadow: 0 0 15px rgba(0, 210, 255, 0.3);
+            text-align: center; display: none; z-index: 100; min-width: 300px;
+        }
+        #main-menu { display: block; } /* Start here */
+        
+        .btn { 
+            background: #000; color: #00d2ff; border: 2px solid #00d2ff; 
+            padding: 10px 20px; font-family: 'Tiny5'; font-size: 20px; cursor: pointer; margin: 10px;
+            text-transform: uppercase; box-shadow: 0 0 5px #00d2ff;
+            transition: 0.2s;
+        }
+        .btn:hover { background: #00d2ff; color: #000; box-shadow: 0 0 20px #00d2ff; }
+        .btn:disabled { border-color: #555; color: #555; box-shadow: none; cursor: not-allowed; }
+        
+        .btn-kick { border-color: red; color: red; box-shadow: 0 0 5px red; padding: 5px 10px; font-size: 14px; margin-left: 10px;}
+        .btn-kick:hover { background: red; color: white; }
+
+        input { 
+            background: #000; color: #fff; border: 2px solid #00d2ff;
+            font-family: 'Tiny5'; font-size: 20px; padding: 10px; text-align: center; outline: none;
         }
 
-        /* Class to hide the loader */
-        .loader-hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-        /* --- END LOADING SCREEN CSS --- */
-
+        /* Player List in Lobby */
+        #player-list { list-style: none; padding: 0; margin: 20px 0; border: 1px solid #333; padding: 10px; }
+        #player-list li { padding: 5px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
 
         /* UI OVERLAY */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; }
-        
         #rng-box {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(0,0,0,0.8); border: 4px solid #fff; padding: 10px;
+            background: rgba(0,0,0,0.8); border: 2px solid #00d2ff; padding: 10px;
             text-align: center; pointer-events: auto; cursor: pointer;
+            box-shadow: 0 0 10px #00d2ff;
         }
-        #rng-box:active { transform: translateX(-50%) scale(0.95); }
-        
-        #item-display { font-size: 30px; color: #ffff00; text-shadow: 0 0 10px #ffff00; }
-        #rng-label { font-size: 14px; color: #aaa; }
-
-        /* MENU STYLES */
-        .menu-screen { 
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.9); padding: 40px; border: 2px solid white; text-align: center;
-            display: none; z-index: 100;
-        }
-        /* Show Main Menu by default, but hidden behind loader initially */
-        #main-menu { display: block; }
-        
-        .btn { 
-            background: #333; color: white; border: 2px solid white; 
-            padding: 10px 20px; font-family: 'Tiny5'; font-size: 20px; cursor: pointer; margin: 10px;
-        }
-        .btn:hover { background: #fff; color: #000; }
-        input { font-family: 'Tiny5'; font-size: 20px; padding: 5px; text-align: center; }
     </style>
 </head>
 <body>
 
     <div id="loading-screen">
         <div class="loader-box">
-            <span style="--i:1;"></span>
-            <span style="--i:2;"></span>
-            <span style="--i:3;"></span>
-            <span style="--i:4;"></span>
-            <span style="--i:5;"></span>
-            <span style="--i:6;"></span>
-            <span style="--i:7;"></span>
-            <span style="--i:8;"></span>
-            <span style="--i:9;"></span>
-            <span style="--i:10;"></span>
-            <span style="--i:11;"></span>
-            <span style="--i:12;"></span>
+            <span style="--i:1;"></span><span style="--i:2;"></span><span style="--i:3;"></span>
+            <span style="--i:4;"></span><span style="--i:5;"></span><span style="--i:6;"></span>
+            <span style="--i:7;"></span><span style="--i:8;"></span><span style="--i:9;"></span>
+            <span style="--i:10;"></span><span style="--i:11;"></span><span style="--i:12;"></span>
         </div>
-        <p style="font-size: 20px; letter-spacing: 2px;">LOADING CHAOS...</p>
+        <p class="neon-text" style="font-size: 20px; letter-spacing: 2px;">LOADING GAME...</p>
     </div>
+
     <div id="main-menu" class="menu-screen">
-        <h1 style="font-size: 60px; margin-bottom: 10px;">PIXEL PLATFORMER</h1>
-        <p style="color: #ffff00;">CHAOS UPDATE</p>
+        <h1 class="neon-text" style="font-size: 50px; margin: 0;">PIXEL CHAOS</h1>
+        <p style="color: #888; margin-bottom: 30px;">MULTIPLAYER LOBBY UPDATE</p>
         <button class="btn" onclick="startSingle()">Single Player</button>
         <button class="btn" onclick="showMenu('multi-menu')">Multiplayer</button>
     </div>
 
     <div id="multi-menu" class="menu-screen">
-        <h2>MULTIPLAYER</h2>
-        <button class="btn" onclick="setupHost()">Host Game</button>
-        <button class="btn" onclick="showMenu('join-menu')">Join Game</button>
-        <br><button class="btn" onclick="showMenu('main-menu')" style="border-color: red;">Back</button>
+        <h2 class="neon-text">MULTIPLAYER</h2>
+        <button class="btn" onclick="setupHost()">Create Lobby</button>
+        <button class="btn" onclick="showMenu('join-menu')">Join Lobby</button>
+        <br><button class="btn" onclick="showMenu('main-menu')" style="border-color: #555; color: #888; box-shadow: none;">Back</button>
     </div>
 
-    <div id="host-menu" class="menu-screen">
-        <h2>LOBBY CREATED</h2>
-        <p>Your Code: <span id="host-code" style="color: #00ffcc; font-size: 30px;">...</span></p>
-        <p>Waiting for player...</p>
+    <div id="lobby-screen" class="menu-screen">
+        <h2 class="neon-text">LOBBY</h2>
+        <p>CODE: <span id="host-code" style="color: #00d2ff; font-size: 30px; border: 1px dashed #00d2ff; padding: 0 10px;">...</span></p>
+        
+        <div style="text-align: left; margin: 10px 0;">PLAYERS (<span id="player-count">1</span>/6):</div>
+        <ul id="player-list">
+            <li>HOST (You)</li>
+        </ul>
+
+        <div id="lobby-status" style="color: yellow; font-size: 14px; margin-bottom: 10px;">Waiting for players...</div>
+        
+        <button id="start-btn" class="btn" onclick="hostStartGame()" disabled>START GAME</button>
+        <button class="btn" onclick="location.reload()" style="border-color: red; color: red; box-shadow: none;">Close Lobby</button>
     </div>
 
     <div id="join-menu" class="menu-screen">
-        <h2>JOIN GAME</h2>
-        <input type="text" id="join-code" placeholder="ENTER CODE" maxlength="4">
+        <h2 class="neon-text">JOIN LOBBY</h2>
+        <input type="text" id="join-code" placeholder="ENTER 4-LETTER CODE" maxlength="4">
+        <br>
         <button class="btn" onclick="joinGame()">Connect</button>
-        <br><button class="btn" onclick="showMenu('multi-menu')" style="border-color: red;">Back</button>
+        <br><button class="btn" onclick="showMenu('multi-menu')" style="border-color: #555; color: #888; box-shadow: none;">Back</button>
+        <p id="join-status" style="color: #888; font-size: 12px;"></p>
+    </div>
+
+    <div id="client-waiting" class="menu-screen">
+        <h2 class="neon-text">CONNECTED</h2>
+        <p>Waiting for host to start...</p>
+        <div class="loader-box" style="transform: scale(0.5);">
+            <span style="--i:1;"></span><span style="--i:2;"></span><span style="--i:3;"></span>
+            <span style="--i:4;"></span><span style="--i:5;"></span><span style="--i:6;"></span>
+            <span style="--i:7;"></span><span style="--i:8;"></span><span style="--i:9;"></span>
+            <span style="--i:10;"></span><span style="--i:11;"></span><span style="--i:12;"></span>
+        </div>
     </div>
 
     <div id="ui-layer">
         <div id="rng-box" onclick="spinRNG()">
-            <div id="rng-label">PRESS 'E' OR CLICK</div>
-            <div id="item-display">???</div>
+            <div style="font-size: 12px; color: #aaa;">PRESS 'E'</div>
+            <div id="item-display" style="font-size: 24px; color: #ffff00;">???</div>
         </div>
-        <div style="position: absolute; top: 20px; left: 20px; font-size: 20px;">
+        <div style="position: absolute; top: 20px; left: 20px; font-size: 20px;" class="neon-text">
             POWER: <span id="power-display">NONE</span>
         </div>
     </div>
@@ -162,270 +164,224 @@
     <canvas id="gameCanvas" width="1000" height="600"></canvas>
 
 <script>
-    // --- LOADING SCREEN LOGIC (ADDED) ---
+    // --- LOADING LOGIC ---
     window.addEventListener('load', function() {
-        // Wait 2 seconds so people can see the animation, then fade out
         setTimeout(function() {
             const loader = document.getElementById('loading-screen');
             loader.classList.add('loader-hidden');
-            
-            // Remove it from the DOM completely after the fade
             loader.addEventListener('transitionend', function() {
-                if(loader.parentNode) {
-                    loader.parentNode.removeChild(loader);
-                }
+                if(loader.parentNode) loader.parentNode.removeChild(loader);
             });
-        }, 2000); // 2000ms = 2 seconds
+        }, 1500); // 1.5s Load time
     });
 
-    // --- CONFIGURATION ---
+    // --- GAME CONFIG ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    // Game State
-    let myId = null;
-    let peer = null;
-    let conn = null;
-    let isGameRunning = false;
-    let isHost = false;
-
-    // Player Objects
-    const ME = { 
-        x: 100, y: 300, w: 40, h: 40, 
-        vx: 0, vy: 0, 
-        color: 'white', power: 'none', item: 'Fists',
-        rolling: false, facingRight: true 
-    };
-    
-    const OTHER = { 
-        x: 800, y: 300, w: 40, h: 40, 
-        color: 'gray', power: 'none', item: 'Fists',
-        rolling: false 
-    };
-
-    // Powers Configuration
-    const POWERS = {
-        'LUCKY': { color: '#FFD700', desc: 'Better RNG Items' },
-        'FAST': { color: '#FF8C00', desc: '1.5x Speed' },
-        'STRONG': { color: '#DC143C', desc: 'High Knockback' },
-        'SMALL': { color: '#FF69B4', desc: 'Tiny Hitbox' },
-        'INVISIBLE': { color: 'rgba(255, 255, 255, 0.2)', desc: 'Ghost Mode' },
-        'TIME FREEZE': { color: '#00BFFF', desc: 'Freezes Enemies' }
-    };
-
-    // Items Configuration
-    const ITEMS = ['Rock', 'Stick', 'Snowball', 'Sword'];
-    
-    // Physics Constants
-    const GRAVITY = 0.8;
-    const JUMP_FORCE = -15;
-    const SPEED = 5;
+    // SLOWER PHYSICS
+    const GRAVITY = 0.6;   // Reduced from 0.8 (Floatier)
+    const JUMP_FORCE = -14; // Adjusted for new gravity
+    const SPEED = 3.5;      // Reduced from 5 (Slower movement)
     const GROUND = 500;
 
-    // Input Tracking
-    const keys = {};
+    let myId = null;
+    let peer = null;
+    let connections = []; // Array of connections (Host only)
+    let hostConn = null;  // Connection to host (Client only)
+    let isHost = false;
+    let isGameRunning = false;
 
-    // --- SETUP & MENUS ---
+    // --- PLAYER OBJECTS ---
+    // In a real game, this would be an array. For this demo, we sync 1 vs 1 logic 
+    // but the lobby supports "waiting" for more.
+    const ME = { x: 100, y: 300, w: 40, h: 40, vx: 0, vy: 0, color: 'white', power: 'none', item: 'Fists', rolling: false, facingRight: true };
+    const OTHER = { x: 800, y: 300, w: 40, h: 40, color: 'gray', power: 'none', item: 'Fists', rolling: false };
+
+    // --- MENUS ---
     function showMenu(id) {
         document.querySelectorAll('.menu-screen').forEach(el => el.style.display = 'none');
         document.getElementById(id).style.display = 'block';
     }
 
-    function generateId() {
-        return Math.random().toString(36).substr(2, 4).toUpperCase();
-    }
+    function generateId() { return Math.random().toString(36).substr(2, 4).toUpperCase(); }
 
-    function assignRandomPower() {
-        const keys = Object.keys(POWERS);
-        const randomKey = keys[Math.floor(Math.random() * keys.length)];
-        ME.power = randomKey;
-        ME.color = POWERS[randomKey].color;
-        
-        // Apply Passive Effects immediately
-        if (ME.power === 'SMALL') { ME.w = 20; ME.h = 20; }
-        
-        document.getElementById('power-display').innerText = randomKey;
-        document.getElementById('power-display').style.color = ME.color;
-    }
-
-    // --- MULTIPLAYER LOGIC ---
+    // --- HOST LOGIC ---
     function setupHost() {
-        showMenu('host-menu');
+        showMenu('lobby-screen');
         myId = generateId();
         document.getElementById('host-code').innerText = myId;
         
         peer = new Peer(myId);
-        peer.on('connection', (c) => {
-            conn = c;
-            startGame();
-        });
-        isHost = true;
-    }
+        peer.on('connection', (conn) => {
+            // MAX PLAYERS CHECK (6 Max)
+            if (connections.length >= 5) { // 5 guests + 1 host = 6
+                conn.send({type: 'KICK', msg: 'Lobby Full'});
+                setTimeout(() => conn.close(), 500);
+                return;
+            }
 
-    function joinGame() {
-        const code = document.getElementById('join-code').value.toUpperCase();
-        peer = new Peer();
-        peer.on('open', () => {
-            conn = peer.connect(code);
-            conn.on('open', () => {
-                startGame();
+            connections.push(conn);
+            updateLobbyUI();
+
+            conn.on('close', () => {
+                connections = connections.filter(c => c !== conn);
+                updateLobbyUI();
             });
         });
-        isHost = false;
+        isHost = true;
+        updateLobbyUI();
     }
 
-    function startSingle() {
+    function updateLobbyUI() {
+        const count = connections.length + 1; // +1 for Host
+        document.getElementById('player-count').innerText = count;
+        
+        const list = document.getElementById('player-list');
+        list.innerHTML = '<li>HOST (You)</li>'; // Reset list
+
+        connections.forEach((conn, index) => {
+            const li = document.createElement('li');
+            li.innerHTML = `Player ${index+2} <button class="btn btn-kick" onclick="kickPlayer(${index})">KICK</button>`;
+            list.appendChild(li);
+        });
+
+        // MIN PLAYERS CHECK (Min 2)
+        const startBtn = document.getElementById('start-btn');
+        const status = document.getElementById('lobby-status');
+        
+        if (count >= 2) {
+            startBtn.disabled = false;
+            status.innerText = "Ready to start!";
+            status.style.color = "#00d2ff";
+        } else {
+            startBtn.disabled = true;
+            status.innerText = "Waiting for players (Min 2)...";
+            status.style.color = "yellow";
+        }
+    }
+
+    function kickPlayer(index) {
+        const conn = connections[index];
+        if (conn) {
+            conn.send({type: 'KICK', msg: 'Host kicked you.'});
+            conn.close();
+            connections.splice(index, 1);
+            updateLobbyUI();
+        }
+    }
+
+    function hostStartGame() {
+        // Tell everyone to start
+        connections.forEach(conn => conn.send({type: 'START'}));
         startGame();
     }
 
+    // --- CLIENT LOGIC ---
+    function joinGame() {
+        const code = document.getElementById('join-code').value.toUpperCase();
+        const status = document.getElementById('join-status');
+        status.innerText = "Connecting...";
+        
+        peer = new Peer();
+        peer.on('open', () => {
+            hostConn = peer.connect(code);
+            
+            hostConn.on('open', () => {
+                showMenu('client-waiting');
+            });
+
+            hostConn.on('data', (data) => {
+                if (data.type === 'START') {
+                    startGame();
+                }
+                if (data.type === 'KICK') {
+                    alert("Disconnected: " + data.msg);
+                    location.reload();
+                }
+                // Game Data Sync
+                if (data.x !== undefined) {
+                    OTHER.x = data.x; OTHER.y = data.y; OTHER.color = data.color; OTHER.item = data.item;
+                }
+            });
+
+            hostConn.on('close', () => {
+                alert("Host disconnected.");
+                location.reload();
+            });
+            
+            isHost = false;
+        });
+    }
+
     // --- GAME ENGINE ---
+    function startSingle() { startGame(); }
+
     function startGame() {
         document.querySelectorAll('.menu-screen').forEach(el => el.style.display = 'none');
         document.getElementById('ui-layer').style.display = 'block';
         
-        assignRandomPower();
-        
-        // Initial positions
-        ME.x = isHost ? 100 : 800;
-        ME.y = 300;
-        
+        // Randomize Power
+        const POWERS = ['LUCKY', 'FAST', 'STRONG', 'SMALL', 'GHOST'];
+        const p = POWERS[Math.floor(Math.random() * POWERS.length)];
+        ME.power = p;
+        document.getElementById('power-display').innerText = p;
+
+        ME.x = isHost ? 100 : 800; // Host left, Guest right
         isGameRunning = true;
         gameLoop();
         
-        // Send data every 20ms (50 times a second)
-        setInterval(sendData, 20);
+        // Network Loop
+        setInterval(() => {
+            if (isHost) {
+                connections.forEach(c => c.send({x: ME.x, y: ME.y, color: ME.color, item: ME.item}));
+            } else if (hostConn) {
+                hostConn.send({x: ME.x, y: ME.y, color: ME.color, item: ME.item});
+            }
+        }, 20);
     }
 
-    // --- INPUT HANDLING ---
+    // --- INPUT & PHYSICS ---
+    const keys = {};
     window.addEventListener('keydown', e => {
         keys[e.key.toLowerCase()] = true;
-        if (e.key === ' ') triggerRoll();
         if (e.key === 'e') spinRNG();
     });
     window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-    function triggerRoll() {
-        if (!ME.rolling) {
-            ME.rolling = true;
-            ME.vx = ME.facingRight ? 15 : -15; // Dash boost
-            setTimeout(() => ME.rolling = false, 300); // 0.3s roll duration
-        }
-    }
-
-    function spinRNG() {
-        // Animation effect
-        const display = document.getElementById('item-display');
-        let iterations = 0;
-        const maxIterations = 10;
-        
-        const interval = setInterval(() => {
-            display.innerText = ITEMS[Math.floor(Math.random() * ITEMS.length)];
-            iterations++;
-            if (iterations > maxIterations) {
-                clearInterval(interval);
-                finalizeItem();
-            }
-        }, 50);
-    }
-
-    function finalizeItem() {
-        let chance = Math.random();
-        
-        // Lucky Power Buff
-        if (ME.power === 'LUCKY') chance += 0.3; 
-
-        let newItem = 'Rock';
-        if (chance > 0.4) newItem = 'Stick';
-        if (chance > 0.7) newItem = 'Snowball';
-        if (chance > 0.9) newItem = 'Sword'; // Rare
-
-        ME.item = newItem;
-        document.getElementById('item-display').innerText = newItem;
-    }
-
-    // --- NETWORK SYNC ---
-    function sendData() {
-        if (conn && conn.open) {
-            conn.send({
-                x: ME.x, y: ME.y,
-                color: ME.color,
-                w: ME.w, h: ME.h,
-                item: ME.item
-            });
-        }
-    }
-
-    // Hacky fix to ensure data listener works
-    setInterval(() => {
-        if(conn) {
-            conn.on('data', (data) => {
-                OTHER.x = data.x;
-                OTHER.y = data.y;
-                OTHER.color = data.color;
-                OTHER.w = data.w;
-                OTHER.h = data.h;
-                OTHER.item = data.item;
-            });
-        }
-    }, 1000);
-
-
-    // --- MAIN LOOP ---
     function update() {
-        // Speed Modifiers
+        // Slow movement logic
         let moveSpeed = SPEED;
         if (ME.power === 'FAST') moveSpeed *= 1.5;
-        if (ME.rolling) moveSpeed *= 2; // Fast during roll
 
-        // Horizontal Move
         if (keys['a']) { ME.vx = -moveSpeed; ME.facingRight = false; }
         else if (keys['d']) { ME.vx = moveSpeed; ME.facingRight = true; }
-        else { ME.vx *= 0.8; } // Friction
+        else { ME.vx *= 0.8; }
 
-        // Jump
-        if (keys['w'] && ME.y + ME.h >= GROUND) {
-            ME.vy = JUMP_FORCE;
-        }
+        if (keys['w'] && ME.y + ME.h >= GROUND) ME.vy = JUMP_FORCE;
 
-        // Apply Physics
         ME.vy += GRAVITY;
         ME.x += ME.vx;
         ME.y += ME.vy;
 
-        // Ground Collision
-        if (ME.y + ME.h > GROUND) {
-            ME.y = GROUND - ME.h;
-            ME.vy = 0;
-        }
-        
-        // Wall Collision
+        if (ME.y + ME.h > GROUND) { ME.y = GROUND - ME.h; ME.vy = 0; }
         if (ME.x < 0) ME.x = 0;
         if (ME.x > canvas.width - ME.w) ME.x = canvas.width - ME.w;
     }
 
+    // --- DRAWING ---
     function draw() {
-        // Clear Screen
-        ctx.fillStyle = '#222';
+        ctx.fillStyle = '#111';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = '#333';
+        ctx.fillRect(0, GROUND, canvas.width, 100); // Floor
 
-        // Draw Floor
-        ctx.fillStyle = '#444';
-        ctx.fillRect(0, GROUND, canvas.width, 100);
-
-        // Draw Me
+        // Draw Players
         ctx.fillStyle = ME.color;
-        // Visual Roll Effect (Squish)
-        let h = ME.h; let y = ME.y;
-        if (ME.rolling) { h = ME.h / 2; y = ME.y + ME.h / 2; }
-        
-        ctx.fillRect(ME.x, y, ME.w, h);
-        
-        // Draw My Item (Simple representation)
-        ctx.fillStyle = 'white';
-        ctx.font = '10px Arial';
-        ctx.fillText(ME.item, ME.x, ME.y - 10);
+        ctx.fillRect(ME.x, ME.y, ME.w, ME.h);
+        ctx.fillStyle = 'white'; ctx.font='10px Arial'; ctx.fillText(ME.item, ME.x, ME.y-10);
 
-        // Draw Other Player
         ctx.fillStyle = OTHER.color;
         ctx.fillRect(OTHER.x, OTHER.y, OTHER.w, OTHER.h);
     }
@@ -436,6 +392,31 @@
         draw();
         requestAnimationFrame(gameLoop);
     }
+
+    // --- RNG LOGIC ---
+    function spinRNG() {
+        const display = document.getElementById('item-display');
+        const items = ['Rock', 'Stick', 'Snowball', 'Sword', 'Bomb'];
+        let i = 0;
+        const interval = setInterval(() => {
+            display.innerText = items[Math.floor(Math.random() * items.length)];
+            i++;
+            if (i > 10) {
+                clearInterval(interval);
+                ME.item = items[Math.floor(Math.random() * items.length)];
+                display.innerText = ME.item;
+            }
+        }, 50);
+    }
+    
+    // Client Data Listener (Separate from Lobby logic)
+    setInterval(() => {
+        if (isHost) {
+            connections.forEach(c => {
+                c.on('data', (d) => { if(d.x !== undefined) { OTHER.x = d.x; OTHER.y = d.y; } });
+            });
+        }
+    }, 1000);
 
 </script>
 </body>
