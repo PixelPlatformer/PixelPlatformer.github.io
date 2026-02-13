@@ -42,16 +42,12 @@
         .lobby-player { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 5px; }
 
         #admin-panel { position: absolute; top: 80px; left: 20px; background: rgba(0,0,0,0.95); border: 2px solid red; padding: 15px; pointer-events: auto; display: none; z-index: 30; width: 200px;}
-        .admin-btn { background: #200; color: #f00; border: 1px solid #f00; width: 100%; margin: 5px 0; cursor: pointer; font-family: 'Tiny5'; }
+        .admin-btn { background: #200; color: #f00; border: 1px solid #f00; width: 100%; margin: 5px 0; cursor: pointer; font-family: 'Tiny5'; padding: 5px; }
     </style>
 </head>
 <body>
-    <div id="loading-overlay">
-        <div class="spinner"></div>
-        <h1 class="neon-glow">LOADING</h1>
-    </div>
-
-    <div id="version-tag" style="position:fixed; bottom:10px; left:10px; font-size:14px; color:rgba(255,255,255,0.3);">v1.16.0</div>
+    <div id="loading-overlay"><div class="spinner"></div><h1 class="neon-glow">INITIALIZING</h1></div>
+    <div id="version-tag" style="position:fixed; bottom:10px; left:10px; font-size:14px; color:rgba(255,255,255,0.3);">v1.17.0</div>
     <canvas id="bg-canvas"></canvas>
     
     <div id="main-menu" class="menu-screen">
@@ -72,15 +68,12 @@
     <div id="host-lobby" class="menu-screen">
         <h2 class="neon-glow">LOBBY: <span id="host-code-display" style="color: #ff4500;">...</span></h2>
         <div id="player-list"><div id="lobby-list-items"></div></div>
-        <button class="btn" onclick="triggerStart()" id="start-btn" disabled style="opacity:0.3;">ENTER ARENA</button>
+        <button class="btn" onclick="triggerStart()" id="start-btn" disabled style="opacity:0.3;">START MATCH</button>
         <button class="btn" onclick="location.reload()">ABANDON</button>
     </div>
 
     <div id="warmup-overlay">3</div>
-    <div id="victory-screen">
-        <h1 class="neon-glow" style="font-size: 80px;">ROUND END</h1>
-        <h2 id="winner-name" style="font-size: 50px; color: #00ffcc;">NAME</h2>
-    </div>
+    <div id="victory-screen"><h1 class="neon-glow" style="font-size: 80px;">ROUND END</h1><h2 id="winner-name" style="font-size: 50px; color: #00ffcc;">-</h2></div>
 
     <div id="ui-layer">
         <div id="match-info">ROUND <span id="round-num">1</span>/5</div>
@@ -97,12 +90,12 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
+    // --- BRANDING ---
     function generateFavicon() {
         const fCanvas = document.createElement('canvas'); fCanvas.width = 32; fCanvas.height = 32;
         const fCtx = fCanvas.getContext('2d');
         fCtx.fillStyle = '#fff'; fCtx.beginPath(); fCtx.arc(16, 16, 14, 0, 6.3); fCtx.fill();
-        fCtx.fillStyle = '#000'; fCtx.beginPath(); fCtx.arc(12, 12, 3, 0, 6.3); fCtx.fill();
-        fCtx.beginPath(); fCtx.arc(20, 12, 3, 0, 6.3); fCtx.fill();
+        fCtx.fillStyle = '#000'; fCtx.beginPath(); fCtx.arc(12, 12, 3, 0, 6.3); fCtx.fill(); fCtx.beginPath(); fCtx.arc(20, 12, 3, 0, 6.3); fCtx.fill();
         document.getElementById('favicon').href = fCanvas.toDataURL();
     }
     generateFavicon();
@@ -112,18 +105,14 @@
     const bgCanvas = document.getElementById('bg-canvas');
     const bgCtx = bgCanvas.getContext('2d');
 
-    const GRAVITY_SEC = 25; 
-    const JUMP_IMPULSE = -13;
-    const MOVE_SPD = 2.2;
+    const GRAVITY = 0.55, JUMP = -13, MOVE_SPD = 2.4;
     const MAGMA_Y = 800;
 
     let PLATFORMS = [];
     let isGameRunning = false, isHost = false, connections = {}, peer, myId;
     let mouseX = 0, mouseY = 0, myAngle = 0, magmaFrame = 0, warmupTime = 0;
-    let players = {}, scores = {};
-    let attackTimer = 0, rollTimer = 0, currentRound = 1, isDead = false, isFrozen = false;
-    let cheatFly = false, cheatLuck = false, cheatInvis = false;
-    let lastTime = performance.now(), isPotato = false;
+    let players = {}, scores = {}, attackTimer = 0, rollTimer = 0, currentRound = 1, isDead = false, isFrozen = false;
+    let cheatFly = false, cheatLuck = false, cheatInvis = false, isPotato = false;
 
     function filterName(name) {
         const blocked = ["nigger", "faggot", "hitler", "retard"];
@@ -217,7 +206,7 @@
         currentRound = num; isDead = false; warmupTime = 180; buildMap();
         const spawnX = [-300, 100, 500, 900];
         const myIdx = isHost ? 0 : Object.keys(players).length;
-        ME.x = spawnX[myIdx % 4]; ME.y = -200; ME.vx = 0; ME.vy = 0;
+        ME.x = spawnX[myIdx % 4]; ME.y = 100; ME.vx = 0; ME.vy = 0;
         for(let id in players) players[id].dead = false;
         document.getElementById('victory-screen').style.display = 'none'; updateUI();
     }
@@ -254,25 +243,28 @@
 
     function roll() { ME.vx = (mouseX > ME.x ? 1 : -1) * 18; rollTimer = 110; }
 
-    function update(dt) {
+    function update() {
         if (!isGameRunning) return;
         magmaFrame++;
         const ov = document.getElementById('warmup-overlay');
         if (warmupTime > 0) {
-            warmupTime--; ov.style.display = 'block'; ov.innerText = Math.ceil(warmupTime/60);
+            warmupTime--; 
+            ov.style.display = 'block'; ov.innerText = Math.ceil(warmupTime/60);
             if(warmupTime === 0) { ov.innerText = "GO!"; setTimeout(()=>ov.style.display='none', 500); }
-            return; 
+            return; // EXIT HERE SO NO GRAVITY APPLIES DURING WARMUP
         }
 
         if(!isDead && !isFrozen) {
             attackTimer--; rollTimer--; ME.swing--;
             if (cheatFly) {
-                if (keys['w']) ME.y -= 400 * dt; if (keys['s']) ME.y += 400 * dt;
-                if (keys['a']) ME.x -= 400 * dt; if (keys['d']) ME.x += 400 * dt;
+                if (keys['w']) ME.y -= 7; if (keys['s']) ME.y += 7;
+                if (keys['a']) ME.x -= 7; if (keys['d']) ME.x += 7;
                 ME.vy = 0; ME.vx = 0;
             } else {
                 if (keys['a']) { ME.vx = -MOVE_SPD; ME.rot -= 0.1; } else if (keys['d']) { ME.vx = MOVE_SPD; ME.rot += 0.1; } else { ME.vx *= 0.88; }
-                ME.vy += GRAVITY_SEC * dt; ME.x += ME.vx; ME.y += ME.vy;
+                
+                ME.vy += GRAVITY; 
+                ME.x += ME.vx; ME.y += ME.vy;
                 ME.grounded = false;
                 PLATFORMS.forEach((p, idx) => {
                     if(p.falling) { p.vy += 0.2; p.y += p.vy; }
@@ -281,7 +273,7 @@
                         if(!p.falling) { p.contactTime++; if(p.contactTime > 300) p.falling = true; }
                     }
                 });
-                if(keys['w'] && ME.grounded) ME.vy = JUMP_IMPULSE * dt;
+                if(keys['w'] && ME.grounded) ME.vy = JUMP;
             }
             if (ME.y > MAGMA_Y) { isDead = true; for(let id in connections) connections[id].send({type:'VOID', id:peer.id}); if(!isHost) checkMatchEnd(); }
         }
@@ -325,7 +317,7 @@
         for(let id in players) if(!players[id].dead) drawPlayer(players[id], players[id].color, false);
     }
 
-    function gameLoop() { let n = performance.now(); let dt = (n - lastTime) / 1000; lastTime = n; update(dt); draw(); if(isGameRunning) requestAnimationFrame(gameLoop); }
+    function gameLoop() { update(); draw(); if(isGameRunning) requestAnimationFrame(gameLoop); }
     function showMenu(id) { document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none'); document.getElementById(id).style.display = 'block'; }
     function updateUI() { document.getElementById('round-num').innerText = currentRound; document.getElementById('inv-slot').innerText = ME.item ? ME.item.name : "EMPTY"; }
 </script>
