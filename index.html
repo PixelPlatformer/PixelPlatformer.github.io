@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arena Royale: v1.10.0</title>
+    <title>Platformer</title>
+    <link id="favicon" rel="icon" type="image/x-icon" href="">
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tiny5&display=swap" rel="stylesheet">
     <style>
@@ -21,8 +22,7 @@
         #main-menu { display: block; }
         .btn { background: #000; color: #fff; border: 1px solid #fff; padding: 12px 20px; font-family: 'Tiny5'; font-size: 22px; cursor: pointer; margin: 10px 0; text-transform: uppercase; width: 100%; transition: 0.2s; }
         .btn:hover { background: #fff; color: #000; box-shadow: 0 0 20px #fff; }
-        .btn-kick { width: auto; font-size: 12px; padding: 2px 8px; border-color: #ff4444; color: #ff4444; margin-left: 10px; }
-        .btn-kick:hover { background: #ff4444; color: #fff; }
+        .btn-kick { width: auto; font-size: 12px; padding: 2px 8px; border-color: #ff4444; color: #ff4444; margin-left: 10px; background: none; cursor: pointer; }
         
         input { background: #000; color: #fff; border: 1px solid #fff; font-family: 'Tiny5'; font-size: 20px; padding: 10px; width: 100%; text-align: center; box-sizing: border-box; outline: none; }
 
@@ -39,7 +39,7 @@
     </style>
 </head>
 <body>
-    <div id="version-tag" style="position:fixed; bottom:10px; left:10px; font-size:14px; color:rgba(255,255,255,0.3);">v1.10.0</div>
+    <div id="version-tag" style="position:fixed; bottom:10px; left:10px; font-size:14px; color:rgba(255,255,255,0.3);">v1.11.0</div>
     <canvas id="bg-canvas"></canvas>
     
     <div id="main-menu" class="menu-screen">
@@ -61,7 +61,7 @@
         <div id="player-list">
             <div id="lobby-list-items"></div>
         </div>
-        <button class="btn" onclick="triggerStart()" id="start-btn" disabled style="opacity:0.3;">ENTER ARENA (2-4 PLAYERS)</button>
+        <button class="btn" onclick="triggerStart()" id="start-btn" disabled style="opacity:0.3;">ENTER ARENA</button>
         <button class="btn" onclick="location.reload()">ABANDON</button>
     </div>
 
@@ -80,6 +80,18 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
+    // --- FAVICON LOGO GENERATOR ---
+    function generateFavicon() {
+        const fCanvas = document.createElement('canvas');
+        fCanvas.width = 32; fCanvas.height = 32;
+        const fCtx = fCanvas.getContext('2d');
+        fCtx.fillStyle = '#fff'; fCtx.beginPath(); fCtx.arc(16, 16, 14, 0, 6.3); fCtx.fill();
+        fCtx.fillStyle = '#000'; fCtx.beginPath(); fCtx.arc(12, 12, 3, 0, 6.3); fCtx.fill();
+        fCtx.beginPath(); fCtx.arc(20, 12, 3, 0, 6.3); fCtx.fill();
+        document.getElementById('favicon').href = fCanvas.toDataURL();
+    }
+    generateFavicon();
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const bgCanvas = document.getElementById('bg-canvas');
@@ -89,8 +101,7 @@
     function buildMap() {
         PLATFORMS = [];
         const segmentWidth = 140;
-        const totalSegments = 20;
-        for(let i=0; i<totalSegments; i++) {
+        for(let i=0; i<20; i++) {
             PLATFORMS.push({ x: -800 + (i * segmentWidth), y: 500, w: segmentWidth - 10, h: 60, contactTime: 0, falling: false, vy: 0 });
         }
     }
@@ -100,13 +111,10 @@
 
     let isGameRunning = false, isHost = false, connections = {}, peer, myId;
     let mouseX = 0, mouseY = 0, myAngle = 0, magmaFrame = 0, warmupTime = 0;
-    let projectiles = [], explosions = [], beams = [];
-    let players = {}; 
-    let scores = {};
-    let cheatFly = false, cheatLuck = false, rollTimer = 0, attackTimer = 0;
-    let currentRound = 1, isDead = false;
+    let projectiles = [], beams = [], players = {}, scores = {};
+    let attackTimer = 0, rollTimer = 0, currentRound = 1, isDead = false;
 
-    const ME = { id: 'me', x: 0, y: 0, r: 22, vx: 0, vy: 0, rot: 0, item: null, name: 'ME', color: '#fff', swing: 0 };
+    const ME = { id: 'me', x: 0, y: 0, r: 22, vx: 0, vy: 0, rot: 0, item: null, name: 'ME', color: '#fff', swing: 0, grounded: false };
 
     function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight; }
     window.addEventListener('resize', resize); resize();
@@ -120,23 +128,18 @@
         document.getElementById('host-code-display').innerText = myId;
         showMenu('host-lobby');
         updateLobbyList();
-
         peer = new Peer(myId);
         peer.on('connection', c => {
             if (Object.keys(connections).length >= 3) return c.close();
-            c.on('open', () => {
-                // Handshake
-                c.send({ type: 'HANDSHAKE_REQ', hostName: ME.name });
-            });
             c.on('data', data => {
                 if (data.type === 'HANDSHAKE_RES') {
                     connections[c.peer] = c;
-                    players[c.peer] = { name: data.name, color: data.color, x: 0, y: 0, dead: false };
+                    players[c.peer] = { name: data.name, color: data.color, x: 0, y: 0, dead: false, rot: 0 };
                     updateLobbyList();
                     initConn(c);
                 }
             });
-            c.on('close', () => { delete connections[c.peer]; delete players[c.peer]; updateLobbyList(); });
+            c.on('open', () => c.send({ type: 'HANDSHAKE_REQ' }));
         });
         isHost = true;
     }
@@ -160,80 +163,65 @@
         });
     }
 
-    function kickPlayer(peerId) {
-        if (connections[peerId]) {
-            connections[peerId].send({ type: 'KICK' });
-            connections[peerId].close();
-            delete connections[peerId];
-            delete players[peerId];
-            updateLobbyList();
-        }
-    }
-
     function updateLobbyList() {
         const list = document.getElementById('lobby-list-items');
         list.innerHTML = `<div class="lobby-player"><span>1. ${ME.name} (YOU)</span></div>`;
         let i = 2;
         for (let id in players) {
-            list.innerHTML += `<div class="lobby-player">
-                <span>${i}. ${players[id].name}</span>
-                ${isHost ? `<button class="btn btn-kick" onclick="kickPlayer('${id}')">KICK</button>` : ''}
-            </div>`;
+            list.innerHTML += `<div class="lobby-player"><span>${i}. ${players[id].name}</span>
+            ${isHost ? `<button class="btn-kick" onclick="kickPlayer('${id}')">[KICK]</button>` : ''}</div>`;
             i++;
         }
-        document.getElementById('start-btn').disabled = (i < 3);
-        document.getElementById('start-btn').style.opacity = (i >= 3) ? "1" : "0.3";
+        document.getElementById('start-btn').disabled = (i < 2);
+        document.getElementById('start-btn').style.opacity = (i >= 2) ? "1" : "0.3";
     }
+
+    function kickPlayer(id) { if(connections[id]) { connections[id].send({type:'KICK'}); connections[id].close(); delete connections[id]; delete players[id]; updateLobbyList(); } }
 
     function initConn(c) {
         c.on('data', data => {
             if (data.type === 'START') startGame();
             if (data.type === 'SYNC_ROUND') syncRound(data.round);
             if (data.type === 'UPDATE') { players[data.id] = data.state; }
-            if (data.type === 'VOID') { if(players[data.id]) players[data.id].dead = true; if(isHost) checkMatchEnd(); }
+            if (data.type === 'VOID') { if(players[data.id]) players[id].dead = true; if(isHost) checkMatchEnd(); }
             if (data.type === 'HIT' && data.target === 'me') { ME.vx = data.vx; ME.vy = data.vy; }
-            if (data.type === 'PROJ') projectiles.push(data.obj);
-            if (data.type === 'EXPLODE') explosions.push({ x: data.x, y: data.y, r: 0, max: 250 });
             if (data.type === 'PLAT_STATE') { let p = PLATFORMS[data.idx]; p.contactTime = data.time; p.falling = data.fall; p.vy = data.vy; p.y = data.py; }
         });
     }
 
-    function triggerStart() {
-        for (let id in connections) connections[id].send({ type: 'START' });
-        startGame();
-    }
+    function triggerStart() { for(let id in connections) connections[id].send({type:'START'}); startGame(); }
 
     function startGame() {
         document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none');
         document.getElementById('ui-layer').style.display = 'block';
         canvas.style.display = 'block';
-        isGameRunning = true; 
+        isGameRunning = true; buildMap();
         syncRound(1);
         requestAnimationFrame(gameLoop);
         setInterval(() => {
             const state = { x: ME.x, y: ME.y, rot: ME.rot, item: ME.item?.name || 'NOTHING', angle: myAngle, name: ME.name, color: ME.color, swing: ME.swing, dead: isDead };
-            for (let id in connections) connections[id].send({ type: 'UPDATE', id: peer.id, state });
-        }, 25);
+            for(let id in connections) connections[id].send({ type: 'UPDATE', id: peer.id, state });
+        }, 30);
     }
 
     function syncRound(num) {
         currentRound = num; isDead = false; warmupTime = 180;
         buildMap();
-        const spawnX = [-400, 0, 400, 800];
-        const myIndex = isHost ? 0 : Object.keys(players).indexOf(peer.id) + 1;
-        ME.x = spawnX[myIndex % 4]; ME.y = -150; ME.vx = 0; ME.vy = 0;
-        for (let id in players) players[id].dead = false;
+        const spawnX = [-300, 100, 500, 900];
+        const myIdx = isHost ? 0 : Object.keys(players).length;
+        ME.x = spawnX[myIdx % 4]; ME.y = 100; // Spawn safely above bridge
+        ME.vx = 0; ME.vy = 0;
+        for(let id in players) players[id].dead = false;
         document.getElementById('victory-screen').style.display = 'none';
         updateUI();
     }
 
-    // --- INPUT & ITEMS ---
+    // --- INPUT ---
     window.onkeydown = e => { 
         if(isDead || warmupTime > 0) return;
         if(e.key === ' ' && attackTimer <= 0) handleAttack();
         if(e.key === 'e') spinRNG();
         if(e.key === 'Shift' && rollTimer <= 0) roll();
-        if(e.key === '/') { const p = prompt("ADMIN KEY:"); if(p === '67412') alert("God mode toggles enabled in UI (if present)"); }
         keys[e.key.toLowerCase()] = true; 
     };
     const keys = {};
@@ -242,38 +230,17 @@
 
     function spinRNG() {
         if(ME.item) return;
-        const items = [{ name: 'STICK', ammo: Infinity }, { name: 'SWORD', ammo: Infinity }, { name: 'SNOWBALL', ammo: 8 }, { name: 'NUKE', ammo: 1 }, { name: 'LASER', ammo: 5 }];
-        let r = Math.random() * 100;
-        let res = items[Math.floor(Math.random() * 3)];
-        if(r < 10) res = items[3]; if(r < 4) res = items[4];
-        ME.item = {...res}; updateUI();
+        const items = [{ name: 'STICK', ammo: Infinity }, { name: 'SWORD', ammo: Infinity }, { name: 'SNOWBALL', ammo: 8 }, { name: 'NUKE', ammo: 1 }];
+        ME.item = {...items[Math.floor(Math.random() * 4)]}; updateUI();
     }
 
     function handleAttack() {
         if(!ME.item) { ME.swing = 10; attackTimer = 50; checkMeleeHit(75, 8); return; }
-        const vx = Math.cos(myAngle), vy = Math.sin(myAngle);
-        if (ME.item.name === 'STICK') { ME.swing = 15; attackTimer = 70; checkMeleeHit(95, 20); } 
-        else if (ME.item.name === 'SWORD') { ME.swing = 20; attackTimer = 85; checkMeleeHit(155, 25); } 
-        else if (ME.item.name === 'SNOWBALL') {
-            const obj = { x: ME.x, y: ME.y, vx: vx * 13, vy: vy * 13, owner: peer.id, type: 'SNOW' };
-            projectiles.push(obj); for(let id in connections) connections[id].send({ type: 'PROJ', obj });
-            ME.item.ammo--; attackTimer = 100;
-        } else if (ME.item.name === 'LASER') {
-             const obj = { sx: ME.x, sy: ME.y, angle: myAngle, owner: peer.id, life: 35 };
-             beams.push(obj); for(let id in connections) connections[id].send({ type: 'BEAM', obj });
-             ME.item.ammo--; attackTimer = 40;
-        }
-        if (ME.item && ME.item.ammo <= 0) ME.item = null;
-        updateUI();
+        ME.item = null; updateUI(); // Simplified attack
     }
 
     function checkMeleeHit(range, force) {
-        for (let id in players) {
-            const p = players[id];
-            if (!p.dead && Math.hypot(p.x - ME.x, p.y - ME.y) < range) {
-                connections[id].send({ type: 'HIT', target: 'me', vx: Math.cos(myAngle) * force, vy: -7 });
-            }
-        }
+        for(let id in players) if(!players[id].dead && Math.hypot(players[id].x-ME.x, players[id].y-ME.y) < range) connections[id].send({type:'HIT', target:'me', vx: Math.cos(myAngle)*force, vy:-7});
     }
 
     function roll() { ME.vx = (mouseX > ME.x ? 1 : -1) * 18; rollTimer = 110; }
@@ -283,54 +250,41 @@
         magmaFrame++;
         if (warmupTime > 0) {
             warmupTime--;
-            const over = document.getElementById('warmup-overlay');
-            over.style.display = 'block';
-            over.innerText = Math.ceil(warmupTime/60);
-            if(warmupTime === 0) { over.innerText = "GO!"; setTimeout(()=>over.style.display='none', 500); }
+            const ov = document.getElementById('warmup-overlay'); ov.style.display = 'block'; ov.innerText = Math.ceil(warmupTime/60);
+            if(warmupTime === 0) { ov.innerText = "GO!"; setTimeout(()=>ov.style.display='none', 500); }
             return;
         }
 
         if(!isDead) {
             attackTimer--; rollTimer--; ME.swing--;
             if (keys['a']) { ME.vx = -BASE_SPEED; ME.rot -= 0.1; } else if (keys['d']) { ME.vx = BASE_SPEED; ME.rot += 0.1; } else { ME.vx *= 0.88; }
-            if(keys['w'] && ME.grounded) ME.vy = JUMP; ME.vy += GRAVITY;
-            ME.x += ME.vx; ME.y += ME.vy;
+            
+            // Gravity Logic
+            ME.vy += GRAVITY;
+            ME.x += ME.vx;
+            ME.y += ME.vy;
+            
             ME.grounded = false;
-
             PLATFORMS.forEach((p, idx) => {
                 if(p.falling) { p.vy += 0.2; p.y += p.vy; }
                 if (ME.vy >= 0 && ME.y + ME.r > p.y && ME.y + ME.r < p.y + 40 && ME.x > p.x && ME.x < p.x + p.w) {
                     ME.y = p.y - ME.r; ME.vy = 0; ME.grounded = true;
-                    if(!p.falling) { 
-                        p.contactTime++; 
-                        if(p.contactTime > 300) p.falling = true;
-                        if(isHost && p.contactTime % 15 === 0) for(let id in connections) connections[id].send({type:'PLAT_STATE', idx, time: p.contactTime, fall: p.falling, vy: p.vy, py: p.y});
-                    }
+                    if(!p.falling) { p.contactTime++; if(p.contactTime > 300) p.falling = true; }
                 }
             });
-            if (ME.y > MAGMA_Y) { isDead = true; for(let id in connections) connections[id].send({type:'VOID', id: peer.id}); if(!isHost) checkMatchEnd(); }
+            if(keys['w'] && ME.grounded) ME.vy = JUMP;
+            if (ME.y > MAGMA_Y) { isDead = true; for(let id in connections) connections[id].send({type:'VOID', id:peer.id}); if(!isHost) checkMatchEnd(); }
         }
-
-        projectiles.forEach((p, i) => { 
-            p.x += p.vx; p.y += p.vy;
-            if (!isDead && Math.hypot(p.x-ME.x, p.y-ME.y)<35 && p.owner!==peer.id){ ME.vx=p.vx; ME.vy=-8; projectiles.splice(i,1); }
-        });
     }
 
     function checkMatchEnd() {
-        if (!isHost) return;
-        let alive = [];
-        if (!isDead) alive.push(ME.name);
-        for (let id in players) if (!players[id].dead) alive.push(players[id].name);
-
-        if (alive.length <= 1) {
-            const winner = alive.length === 1 ? alive[0] : "DRAW";
-            document.getElementById('winner-name').innerText = winner;
-            document.getElementById('victory-screen').style.display = 'flex';
-            setTimeout(() => {
-                if(currentRound < 5) { currentRound++; for(let id in connections) connections[id].send({type:'SYNC_ROUND', round:currentRound}); syncRound(currentRound); }
-                else { alert("SERIES FINISHED!"); location.reload(); }
-            }, 3000);
+        if(!isHost) return;
+        let alive = []; if(!isDead) alive.push(ME.name);
+        for(let id in players) if(!players[id].dead) alive.push(players[id].name);
+        if(alive.length <= 1) {
+            const win = alive[0] || "DRAW";
+            document.getElementById('winner-name').innerText = win; document.getElementById('victory-screen').style.display='flex';
+            setTimeout(() => { if(currentRound < 5) { currentRound++; for(let id in connections) connections[id].send({type:'SYNC_ROUND', round:currentRound}); syncRound(currentRound); } else location.reload(); }, 3000);
         }
     }
 
@@ -339,10 +293,10 @@
         ctx.fillStyle="#fff"; ctx.font="14px 'Tiny5'"; ctx.textAlign="center"; ctx.fillText(p.name, 0, -40);
         ctx.strokeStyle = "#000"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0, 0, p.r, 0, 6.3); ctx.stroke();
         ctx.rotate(p.rot); ctx.fillStyle = color; ctx.beginPath(); ctx.arc(0, 0, p.r, 0, 6.3); ctx.fill();
+        ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(6, -5, 3, 0, 6.3); ctx.fill(); ctx.beginPath(); ctx.arc(-6, -5, 3, 0, 6.3); ctx.fill();
         ctx.restore();
         ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(isMe ? myAngle : p.angle);
-        const s = p.swing ? Math.sin(p.swing * 0.4) * 60 : 0; ctx.rotate(s * Math.PI / 180);
-        ctx.fillStyle = color; ctx.strokeStyle="#000"; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(42, 0, 10, 0, 6.3); ctx.fill(); ctx.stroke(); 
+        ctx.fillStyle = color; ctx.strokeStyle="#000"; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(42, 0, 10, 0, 6.3); ctx.fill(); ctx.stroke();
         ctx.restore();
     }
 
@@ -350,7 +304,6 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         bgCtx.fillStyle = "#0a0a0a"; bgCtx.fillRect(0,0,bgCanvas.width,bgCanvas.height);
         PLATFORMS.forEach(p => {
-            if(p.y > canvas.height + 100) return;
             let shake = (p.contactTime > 180 && !p.falling) ? Math.sin(Date.now()*0.2)*6 : 0;
             ctx.fillStyle = "#3e2723"; ctx.fillRect(p.x+shake, p.y+20, p.w, 30);
             ctx.fillStyle = "#4caf50"; ctx.fillRect(p.x+shake, p.y, p.w, 15);
@@ -359,22 +312,15 @@
             let flicker = Math.sin(magmaFrame*0.05 + x)*12;
             ctx.fillStyle = "#ff4500"; ctx.fillRect(x, MAGMA_Y + flicker, 42, 400);
         }
-        beams.forEach((b, i) => { 
-            ctx.strokeStyle = "red"; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(b.sx, b.sy);
-            ctx.lineTo(b.sx + Math.cos(b.angle)*2000, b.sy + Math.sin(b.angle)*2000); ctx.stroke();
-            b.life--; if(b.life <= 0) beams.splice(i,1);
-        });
-        projectiles.forEach(p => { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 6.3); ctx.fill(); });
-        if(!isDead) drawPlayer(ME, ME.color, true); 
-        for (let id in players) if (!players[id].dead) drawPlayer(players[id], players[id].color, false);
+        if(!isDead) drawPlayer(ME, ME.color, true);
+        for(let id in players) if(!players[id].dead) drawPlayer(players[id], players[id].color, false);
     }
 
     function gameLoop() { update(); draw(); if(isGameRunning) requestAnimationFrame(gameLoop); }
     function showMenu(id) { document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none'); document.getElementById(id).style.display = 'block'; }
-    function updateUI() {
-        document.getElementById('round-num').innerText = currentRound;
-        document.getElementById('inv-slot').innerText = ME.item ? `${ME.item.name}` : "EMPTY";
-    }
+    function updateUI() { document.getElementById('round-num').innerText = currentRound; document.getElementById('inv-slot').innerText = ME.item ? ME.item.name : "EMPTY"; }
+    function animParticles() { bgCtx.fillStyle = "#000"; bgCtx.fillRect(0,0,bgCanvas.width,bgCanvas.height); bgCtx.fillStyle="#fff"; for(let i=0; i<30; i++) bgCtx.fillRect(Math.random()*bgCanvas.width, Math.random()*bgCanvas.height, 2, 2); if(!isGameRunning) requestAnimationFrame(animParticles); }
+    animParticles();
 </script>
 </body>
 </html>
