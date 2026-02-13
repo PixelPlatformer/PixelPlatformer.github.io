@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Platformer: Social Update</title>
+    <title>Arena Royale: v1.5.0</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tiny5&display=swap" rel="stylesheet">
     <style>
@@ -16,48 +16,45 @@
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: #000; z-index: 9999;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            transition: opacity 0.8s ease;
+            transition: opacity 0.5s ease;
         }
-        .loader-box { position: relative; width: 100px; height: 100px; margin-bottom: 20px; }
+        .loader-box { position: relative; width: 80px; height: 80px; margin-bottom: 20px; }
         .loader-box span { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: rotate(calc(30deg * var(--i))); }
-        .loader-box span::before { content: ''; position: absolute; top: 0; left: 0; width: 15px; height: 15px; background: #fff; box-shadow: 0 0 10px #fff, 0 0 20px #fff; opacity: 0; animation: fadeSquare 1s linear infinite; animation-delay: calc(1s / 12 * var(--i)); }
+        .loader-box span::before { content: ''; position: absolute; top: 0; left: 0; width: 12px; height: 12px; background: #fff; box-shadow: 0 0 10px #fff; opacity: 0; animation: fadeSquare 1s linear infinite; animation-delay: calc(1s / 12 * var(--i)); }
         @keyframes fadeSquare { 0% { opacity: 1; transform: scale(1.2); } 80%, 100% { opacity: 0; transform: scale(1); } }
 
         /* --- MENUS --- */
-        .neon-text { color: #fff; text-shadow: 0 0 10px #fff, 0 0 20px #fff; }
+        .neon-text { color: #fff; text-shadow: 0 0 10px #fff, 0 0 20px #fff; text-align: center; }
         .menu-screen { 
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            text-align: center; display: none; z-index: 100; min-width: 450px;
+            text-align: center; display: none; z-index: 100; min-width: 400px;
             background: rgba(0,0,0,0.95); padding: 30px; border: 2px solid #fff; box-shadow: 0 0 20px #fff;
         }
         #main-menu { display: block; }
-        .btn { background: #000; color: #fff; border: 2px solid #fff; padding: 12px 20px; font-family: 'Tiny5'; font-size: 20px; cursor: pointer; margin: 8px 0; text-transform: uppercase; width: 100%; transition: 0.3s; }
+        .btn { background: #000; color: #fff; border: 2px solid #fff; padding: 12px 20px; font-family: 'Tiny5'; font-size: 20px; cursor: pointer; margin: 8px 0; text-transform: uppercase; width: 100%; transition: 0.2s; }
         .btn:hover { background: #fff; color: #000; box-shadow: 0 0 15px #fff; }
         input { background: #000; color: #fff; border: 2px solid #fff; font-family: 'Tiny5'; font-size: 20px; padding: 10px; width: 100%; text-align: center; box-sizing: border-box; margin-bottom: 10px; }
-
-        /* --- FRIEND LIST --- */
-        #friend-list { margin-top: 15px; border-top: 1px solid #444; padding-top: 10px; max-height: 150px; overflow-y: auto; }
-        .friend-item { display: flex; justify-content: space-between; align-items: center; padding: 5px; font-size: 14px; border-bottom: 1px solid #222; }
-        .invite-btn { width: auto; padding: 2px 10px; font-size: 12px; }
 
         /* --- UI OVERLAYS --- */
         #version-tag { position: fixed; bottom: 10px; left: 10px; font-size: 14px; color: rgba(255,255,255,0.5); z-index: 1000; }
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; z-index: 20; }
-        #match-timer { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 40px; color: #fff; }
-        #scoreboard { position: absolute; top: 20px; right: 20px; text-align: right; }
-        #power-display { position: absolute; top: 20px; left: 20px; font-size: 20px; color: #ffff00; }
+        #match-info { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); text-align: center; }
+        #round-display { font-size: 30px; color: #fff; text-shadow: 2px 2px #000; }
+        #scoreboard { position: absolute; top: 20px; right: 20px; text-align: right; font-size: 20px; }
+        
         #inventory-ui { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
-        .inv-slot { width: 75px; height: 75px; background: rgba(0,0,0,0.8); border: 3px solid #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; }
-        .inv-active { border-color: #ffff00; }
-        #rng-box { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); border: 2px solid #fff; padding: 10px 30px; pointer-events: auto; cursor: pointer; }
+        .inv-slot { width: 70px; height: 70px; background: rgba(0,0,0,0.8); border: 2px solid #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; }
+        .inv-active { border-color: #ffff00; box-shadow: 0 0 10px #ffff00; }
+        
         #admin-panel { position: absolute; top: 60px; left: 20px; background: rgba(0,0,0,0.9); border: 1px solid red; padding: 10px; pointer-events: auto; display: none; }
+        #game-msg { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 60px; text-shadow: 4px 4px #000; display: none; text-align: center; }
     </style>
 </head>
 <body>
-    <div id="version-tag">v1.4.0 (Social Update)</div>
+    <div id="version-tag">v1.5.0</div>
 
     <div id="loading-screen">
-        <h1 class="neon-text" style="font-size: 40px; margin-bottom: 20px;">CONNECTING ACCOUNTS...</h1>
+        <h1 class="neon-text">INITIALIZING ARENA...</h1>
         <div class="loader-box">
             <span style="--i:1;"></span><span style="--i:2;"></span><span style="--i:3;"></span><span style="--i:4;"></span><span style="--i:5;"></span><span style="--i:6;"></span><span style="--i:7;"></span><span style="--i:8;"></span><span style="--i:9;"></span><span style="--i:10;"></span><span style="--i:11;"></span><span style="--i:12;"></span>
         </div>
@@ -66,20 +63,14 @@
     <canvas id="bg-canvas"></canvas>
     
     <div id="main-menu" class="menu-screen">
-        <h1 class="neon-text" style="font-size: 50px;">PIXEL PLATFORMER</h1>
-        <div id="account-info" style="font-size: 14px; margin-bottom: 10px; color: #00ffcc;"></div>
+        <h1 class="neon-text" style="font-size: 50px; margin-bottom: 20px;">ARENA ROYALE</h1>
         <input type="text" id="player-name-input" placeholder="USERNAME" maxlength="10">
         <button class="btn" onclick="setupHost()">HOST GAME</button>
         <button class="btn" onclick="showMenu('join-menu')">JOIN GAME</button>
-        
-        <div id="friend-list-container">
-            <p style="font-size: 16px; margin: 10px 0 5px 0;">FRIENDS LIST</p>
-            <div id="friend-list"></div>
-        </div>
     </div>
 
     <div id="join-menu" class="menu-screen">
-        <h2 class="neon-text">JOIN LOBBY</h2>
+        <h2 class="neon-text">JOIN ARENA</h2>
         <input type="text" id="join-code-input" placeholder="4-LETTER CODE">
         <button class="btn" onclick="joinGame()">CONNECT</button>
         <button class="btn" onclick="showMenu('main-menu')">BACK</button>
@@ -87,38 +78,31 @@
 
     <div id="host-lobby" class="menu-screen">
         <h2 class="neon-text">LOBBY: <span id="host-code-display" style="color: #00ffff;">...</span></h2>
-        <div style="margin: 10px 0;">
-            MODE: 
-            <select id="gamemode-select" style="font-family: 'Tiny5'; background: #000; color: #fff; border: 1px solid #fff;">
-                <option value="FIGHT">FIGHT (DEFAULT)</option>
-                <option value="TAG">TAG (NO ITEMS)</option>
-            </select>
-        </div>
-        <div id="player-list" style="margin: 20px 0; text-align: left;">
-            <p>1. HOST (YOU)</p>
-            <div id="opponent-entry" style="display:flex; justify-content:space-between; align-items:center;">
-                <span>Waiting for player...</span>
-            </div>
-        </div>
-        <button class="btn" onclick="triggerStart()" id="start-btn" disabled style="opacity:0.5;">START MATCH</button>
+        <p>Gamemode: Free For All (5 Rounds)</p>
+        <div id="opponent-entry" style="margin: 20px 0; color: #fff;">Waiting for opponent...</div>
+        <button class="btn" onclick="triggerStart()" id="start-btn" disabled style="opacity:0.5;">START BATTLE</button>
         <button class="btn" onclick="location.reload()">CANCEL</button>
     </div>
 
     <div id="ui-layer">
-        <div id="match-timer">03:00</div>
+        <div id="match-info">
+            <div id="round-display">ROUND 1/5</div>
+        </div>
+        <div id="scoreboard">
+            <div id="score-me-display">ME: 0</div>
+            <div id="score-enemy-display" style="color: #ff4444;">OPP: 0</div>
+        </div>
+        <div id="game-msg">ROUND START!</div>
         <div id="admin-panel">
             <button class="btn" onclick="toggleCheat('fly')">FLY</button>
             <button class="btn" onclick="toggleCheat('luck')">LUCK</button>
         </div>
-        <div id="scoreboard"><div id="score-me-display">ME: 0</div><div id="score-enemy-display" style="color: #ff4444;">OPP: 0</div></div>
-        <div id="power-display">POWER: NONE</div>
-        <div id="pickup-prompt">PRESS 'R' TO PICK UP <span id="item-name"></span></div>
         <div id="inventory-ui">
             <div class="inv-slot inv-active" id="slot-0">EMPTY</div>
             <div class="inv-slot" id="slot-1">EMPTY</div>
             <div class="inv-slot" id="slot-2">EMPTY</div>
         </div>
-        <div id="rng-box" onclick="spinRNG()"><div>CLICK FOR ITEM</div><div id="item-display" style="font-size: 24px;">NOTHING</div></div>
+        <div id="rng-box" onclick="spinRNG()"><div>CLICK FOR ITEM</div><div id="item-display">NOTHING</div></div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -129,55 +113,43 @@
     const bgCanvas = document.getElementById('bg-canvas');
     const bgCtx = bgCanvas.getContext('2d');
 
-    // --- ACCOUNT LOGIC ---
-    let userData = JSON.parse(localStorage.getItem('pixel_fighter_account')) || { name: "", wins: 0, friends: [] };
+    // --- FORCED LOADING EXIT ---
+    window.onload = () => {
+        setTimeout(() => {
+            const ls = document.getElementById('loading-screen');
+            ls.style.opacity = '0';
+            setTimeout(() => ls.style.display = 'none', 500);
+        }, 1500);
+    };
 
-    function saveAccount() { localStorage.setItem('pixel_fighter_account', JSON.stringify(userData)); }
-
-    function updateAccountUI() {
-        const nameInput = document.getElementById('player-name-input');
-        if(userData.name) nameInput.value = userData.name;
-        document.getElementById('account-info').innerText = `Logged in as: ${userData.name || "Guest"} | Total Wins: ${userData.wins}`;
-        
-        const list = document.getElementById('friend-list');
-        list.innerHTML = userData.friends.length ? "" : "<p style='color:#666'>No friends added yet.</p>";
-        userData.friends.forEach(f => {
-            list.innerHTML += `<div class="friend-item"><span>${f.name}</span><button class="btn invite-btn" onclick="autoJoin('${f.id}')">JOIN</button></div>`;
-        });
-    }
-    updateAccountUI();
-
-    function autoJoin(id) { document.getElementById('join-code-input').value = id; joinGame(); }
-
-    // --- GAME DATA ---
-    const PLATFORMS = [{ x: 300, y: 450, w: 600, h: 60 }, { x: -150, y: 380, w: 250, h: 40 }, { x: -500, y: 450, w: 250, h: 40 }, { x: 1050, y: 350, w: 250, h: 40 }, { x: 550, y: 250, w: 100, h: 20 }];
-    const SPAWNS = [{ x: 600, y: 100 }, { x: 0, y: 200 }, { x: 1150, y: 200 }];
+    // --- GAME CONSTANTS ---
+    const ARENA = { x: 200, y: 450, w: 800, h: 80 }; // One big platform
     const LAVA_Y = 650;
-    const GRAVITY = 0.55;
-    const BASE_SPEED = 1.5;
+    const GRAVITY = 0.55, JUMP = -13, BASE_SPEED = 1.6;
 
     let isGameRunning = false, isHost = false, conn, peer, myId;
-    let mouseX = 0, mouseY = 0, myAngle = 0, gameMode = "FIGHT";
-    let projectiles = [], explosions = [], beams = [], droppedItems = [], scores = { me: 0, enemy: 0 };
-    let cheatFly = false, cheatLuck = false, rollTimer = 0, attackTimer = 0, reloadTimer = 0, matchTime = 180, lavaFrame = 0;
-    let selectedSlot = 0, itPlayer = "HOST"; // For TAG mode
+    let mouseX = 0, mouseY = 0, myAngle = 0;
+    let projectiles = [], explosions = [], beams = [], scores = { me: 0, enemy: 0 };
+    let cheatFly = false, cheatLuck = false, rollTimer = 0, attackTimer = 0, reloadTimer = 0;
+    let currentRound = 1, totalRounds = 5, isDead = false, oppDead = false, lavaFrame = 0, selectedSlot = 0;
 
-    const ME = { x: 0, y: 0, r: 20, vx: 0, vy: 0, rot: 0, inventory: [], name: 'ME', color: '#fff', swing: 0, power: 'NONE' };
+    const ME = { x: 0, y: 0, r: 20, vx: 0, vy: 0, rot: 0, inventory: [], name: 'ME', color: '#fff', swing: 0 };
     const OTHER = { x: 0, y: 0, r: 20, rot: 0, item: 'NOTHING', name: 'OPP', angle: 0, color: '#ff4444', swing: 0 };
 
     function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight; }
     window.addEventListener('resize', resize); resize();
     function randColor() { return `hsl(${Math.random() * 360}, 80%, 60%)`; }
 
-    // --- MULTIPLAYER & LOBBY ---
+    // --- MULTIPLAYER ---
     function setupHost() {
-        userData.name = document.getElementById('player-name-input').value || "HOST"; saveAccount();
+        ME.name = document.getElementById('player-name-input').value || "HOST";
         myId = Math.random().toString(36).substr(2, 4).toUpperCase();
         document.getElementById('host-code-display').innerText = myId;
         showMenu('host-lobby');
         peer = new Peer(myId);
         peer.on('connection', c => {
             conn = c;
+            document.getElementById('opponent-entry').innerText = "OPPONENT READY!";
             document.getElementById('start-btn').disabled = false;
             document.getElementById('start-btn').style.opacity = "1";
             initConn();
@@ -185,16 +157,8 @@
         isHost = true;
     }
 
-    function addFriend() {
-        if(!userData.friends.find(f => f.id === conn.peer)) {
-            userData.friends.push({ name: OTHER.name, id: conn.peer });
-            saveAccount(); updateAccountUI();
-            alert("Friend Added!");
-        }
-    }
-
     function joinGame() {
-        userData.name = document.getElementById('player-name-input').value || "GUEST"; saveAccount();
+        ME.name = document.getElementById('player-name-input').value || "GUEST";
         const code = document.getElementById('join-code-input').value.toUpperCase();
         peer = new Peer();
         peer.on('open', () => { conn = peer.connect(code); conn.on('open', () => initConn()); });
@@ -202,51 +166,75 @@
 
     function initConn() {
         conn.on('data', data => {
-            if (data.type === 'START') { gameMode = data.mode; startGame(); }
-            if (data.type === 'TAGGED') { itPlayer = data.it; }
+            if (data.type === 'START') startGame();
+            if (data.type === 'NEXT_ROUND') resetRound(data.round);
             if (data.x !== undefined) {
                 OTHER.x = data.x; OTHER.y = data.y; OTHER.rot = data.rot;
                 OTHER.item = data.item; OTHER.angle = data.angle; OTHER.name = data.name; OTHER.color = data.color; OTHER.swing = data.swing;
             }
-            if (data.type === 'POINT') { scores.enemy++; updateUI(); }
+            if (data.type === 'VOID') { oppDead = true; checkRoundEnd(); }
             if (data.type === 'HIT') { ME.vx = data.vx; ME.vy = data.vy; }
-            if (data.type === 'TIME') matchTime = data.val;
             if (data.type === 'PROJ') projectiles.push(data.obj);
             if (data.type === 'BEAM') beams.push(data.obj);
             if (data.type === 'EXPLODE') explosions.push({ x: data.x, y: data.y, r: 0, max: 200 });
         });
-        document.getElementById('opponent-entry').innerHTML = `2. PLAYER JOINED <button class="btn invite-btn" onclick="addFriend()">ADD FRIEND</button>`;
         showMenu('host-lobby');
     }
 
-    function triggerStart() {
-        gameMode = document.getElementById('gamemode-select').value;
-        if (conn) conn.send({ type: 'START', mode: gameMode });
-        startGame();
-    }
+    function triggerStart() { if (conn) conn.send({ type: 'START' }); startGame(); }
 
     function startGame() {
         document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none');
         document.getElementById('ui-layer').style.display = 'block';
         canvas.style.display = 'block';
         isGameRunning = true; ME.color = randColor();
-        respawn();
+        resetRound(1);
         requestAnimationFrame(gameLoop);
-        if(isHost) setInterval(() => { matchTime--; if(conn) conn.send({type:'TIME', val:matchTime}); }, 1000);
         setInterval(() => {
             if (conn && conn.open) conn.send({ x: ME.x, y: ME.y, rot: ME.rot, item: ME.inventory[selectedSlot]?.name || 'NOTHING', angle: myAngle, name: ME.name, color: ME.color, swing: ME.swing });
         }, 20);
     }
 
-    function respawn() { const spot = SPAWNS[Math.floor(Math.random() * SPAWNS.length)]; ME.x = spot.x; ME.y = spot.y; ME.vx = 0; ME.vy = 0; }
+    function resetRound(num) {
+        currentRound = num;
+        isDead = false; oppDead = false;
+        ME.x = isHost ? 300 : 900; ME.y = 100; ME.vx = 0; ME.vy = 0;
+        document.getElementById('round-display').innerText = `ROUND ${currentRound}/${totalRounds}`;
+        const msg = document.getElementById('game-msg');
+        msg.innerText = `ROUND ${currentRound}`; msg.style.display = 'block';
+        setTimeout(() => msg.style.display = 'none', 1500);
+        updateUI();
+    }
 
+    function checkRoundEnd() {
+        if (!isHost) return;
+        if (isDead || oppDead) {
+            if (oppDead && !isDead) scores.me++;
+            if (isDead && !oppDead) scores.enemy++;
+            
+            setTimeout(() => {
+                if (currentRound < totalRounds) {
+                    currentRound++;
+                    if (conn) conn.send({ type: 'NEXT_ROUND', round: currentRound });
+                    resetRound(currentRound);
+                } else {
+                    const winner = scores.me > scores.enemy ? ME.name : OTHER.name;
+                    alert(`GAME OVER! WINNER: ${winner}`);
+                    location.reload();
+                }
+            }, 2000);
+        }
+    }
+
+    // --- CONTROLS ---
     window.onkeydown = e => { 
-        if(e.key === ' ' && attackTimer <= 0 && reloadTimer <= 0 && gameMode !== 'TAG') handleAttack();
-        if(e.key === 'e' && gameMode !== 'TAG') spinRNG();
+        if(isDead) return;
+        if(e.key === ' ' && attackTimer <= 0) handleAttack();
+        if(e.key === 'e') spinRNG();
         if(['1','2','3'].includes(e.key)) selectedSlot = parseInt(e.key)-1;
         if(e.key === 'Shift' && rollTimer <= 0) roll();
         if(e.key === '/') { const p = prompt("ADMIN?"); if(p === '15542') document.getElementById('admin-panel').style.display='block'; }
-        keys[e.key.toLowerCase()] = true; updateUI();
+        keys[e.key.toLowerCase()] = true; 
     };
     const keys = {};
     window.onkeyup = e => keys[e.key.toLowerCase()] = false;
@@ -256,22 +244,22 @@
         if(ME.inventory.length >= 3) return;
         const items = [{ name: 'STICK', ammo: Infinity }, { name: 'SWORD', ammo: Infinity }, { name: 'SNOWBALL', ammo: 8 }, { name: 'NUKE', ammo: 1 }, { name: 'LASER', ammo: 10 }];
         let res = items[Math.floor(Math.random() * 3)];
-        let r = Math.random() * 100;
-        if(cheatLuck || r < 10) res = items[3];
-        if(cheatLuck || r < 2) res = items[4];
+        if(cheatLuck || Math.random() < 0.1) res = items[3];
+        if(cheatLuck || Math.random() < 0.05) res = items[4];
         ME.inventory.push({...res});
         updateUI();
     }
 
     function handleAttack() {
-        const item = ME.inventory[selectedSlot]; if(!item) return;
+        const item = ME.inventory[selectedSlot] || { name: 'FIST', ammo: Infinity };
         const vx = Math.cos(myAngle), vy = Math.sin(myAngle);
-        if (item.name === 'STICK') { ME.swing = 15; attackTimer = 90; checkMeleeHit(85, 18); } 
-        else if (item.name === 'SWORD') { ME.swing = 20; attackTimer = 90; checkMeleeHit(130, 22); } 
+        if (item.name === 'FIST') { ME.swing = 10; attackTimer = 60; checkMeleeHit(65, 8); } 
+        else if (item.name === 'STICK') { ME.swing = 15; attackTimer = 80; checkMeleeHit(85, 18); } 
+        else if (item.name === 'SWORD') { ME.swing = 20; attackTimer = 80; checkMeleeHit(130, 22); } 
         else if (item.name === 'SNOWBALL') {
             const obj = { x: ME.x, y: ME.y, vx: vx * 12, vy: vy * 12, owner: 'ME', type: 'SNOW' };
             projectiles.push(obj); if(conn) conn.send({ type: 'PROJ', obj: { ...obj, owner: 'OTHER' } });
-            item.ammo--; reloadTimer = 120;
+            item.ammo--; reloadTimer = 100;
         } else if (item.name === 'NUKE') {
             const obj = { x: ME.x, y: ME.y, vx: vx * 6, vy: vy * 4, owner: 'ME', type: 'NUKE' };
             projectiles.push(obj); if(conn) conn.send({ type: 'PROJ', obj: { ...obj, owner: 'OTHER' } });
@@ -297,86 +285,72 @@
     function toggleCheat(c) { if(c==='fly') cheatFly=!cheatFly; if(c==='luck') cheatLuck=!cheatLuck; }
 
     function update() {
-        if (!isGameRunning) return;
-        if (matchTime <= 0) { 
-            isGameRunning = false; 
-            if(scores.me > scores.enemy) { userData.wins++; saveAccount(); }
-            alert("Match Over!"); location.reload(); 
-        }
-        if (attackTimer > 0) attackTimer--; if (rollTimer > 0) rollTimer--; if (reloadTimer > 0) reloadTimer--; if (ME.swing > 0) ME.swing--; lavaFrame++;
+        if (!isGameRunning || isDead) return;
+        if (attackTimer > 0) attackTimer--; if (rollTimer > 0) rollTimer--; 
+        if (ME.swing > 0) ME.swing--; lavaFrame++;
 
-        // TAG MODE LOGIC
-        if (gameMode === 'TAG') {
-            const d = Math.hypot(ME.x - OTHER.x, ME.y - OTHER.y);
-            const myRole = isHost ? "HOST" : "GUEST";
-            if (d < 45 && itPlayer === myRole) {
-                itPlayer = isHost ? "GUEST" : "HOST";
-                if(conn) conn.send({ type: 'TAGGED', it: itPlayer });
-            }
-        }
-
-        let spd = BASE_SPEED;
-        if (keys['a']) { ME.vx = -spd; ME.rot -= 0.1; } else if (keys['d']) { ME.vx = spd; ME.rot += 0.1; } else { ME.vx *= 0.85; }
-        if(!cheatFly) { if(keys['w'] && ME.grounded) ME.vy = -13; ME.vy += 0.55; }
+        if (keys['a']) { ME.vx = -BASE_SPEED; ME.rot -= 0.1; } else if (keys['d']) { ME.vx = BASE_SPEED; ME.rot += 0.1; } else { ME.vx *= 0.85; }
+        if(!cheatFly) { if(keys['w'] && ME.grounded) ME.vy = JUMP; ME.vy += GRAVITY; }
         else { if(keys['w']) ME.vy = -5; else if(keys['s']) ME.vy = 5; else ME.vy = 0; }
-        ME.x += ME.vx; ME.y += ME.vy; ME.grounded = false;
-        PLATFORMS.forEach(p => { if (ME.vy >= 0 && ME.y + ME.r > p.y && ME.y + ME.r < p.y + p.h && ME.x > p.x && ME.x < p.x + p.w) { ME.y = p.y - ME.r; ME.vy = 0; ME.grounded = true; } });
-        if (ME.y > LAVA_Y) { respawn(); scores.enemy++; ME.color = randColor(); updateUI(); if(conn) conn.send({type:'POINT'}); }
+        ME.x += ME.vx; ME.y += ME.vy;
+        ME.grounded = false;
+        if (ME.vy >= 0 && ME.y + ME.r > ARENA.y && ME.y + ME.r < ARENA.y + ARENA.h && ME.x > ARENA.x && ME.x < ARENA.x + ARENA.w) { ME.y = ARENA.y - ME.r; ME.vy = 0; ME.grounded = true; }
+
+        if (ME.y > LAVA_Y) { isDead = true; if(conn) conn.send({type:'VOID'}); if(!isHost) checkRoundEnd(); }
+        
         projectiles.forEach((p, i) => {
             p.x += p.vx; p.y += p.vy; if(p.type==='NUKE') p.vy+=0.15;
             if (Math.hypot(p.x - ME.x, p.y - ME.y) < 30 && p.owner === 'OTHER') { ME.vx = p.vx; ME.vy = -8; projectiles.splice(i, 1); }
-            PLATFORMS.forEach(plat => { if(p.type==='NUKE' && p.y > plat.y && p.x > plat.x && p.x < plat.x + plat.w) { explosions.push({x:p.x, y:p.y, r:0, max:220}); if(conn) conn.send({type:'EXPLODE', x:p.x, y:p.y}); projectiles.splice(i,1); } });
+            if(p.type==='NUKE' && p.y > ARENA.y && p.x > ARENA.x && p.x < ARENA.x + ARENA.w) { explosions.push({x:p.x, y:p.y, r:0, max:220}); if(conn) conn.send({type:'EXPLODE', x:p.x, y:p.y}); projectiles.splice(i,1); }
         });
         explosions.forEach((e, i) => { e.r += 12; if (Math.hypot(ME.x - e.x, ME.y - e.y) < e.r && e.r < 60) { ME.vx = (ME.x-e.x)*0.6; ME.vy=-20; } if(e.r > e.max) explosions.splice(i, 1); });
-        beams.forEach((b, i) => { b.life--; if(b.owner==='OTHER') { const ang = Math.atan2(ME.y-b.sy, ME.x-b.sx); if(Math.abs(b.angle-ang)<0.12) { ME.vx += Math.cos(b.angle)*2.5; ME.vy -= 0.2; } } if(b.life<=0) beams.splice(i,1); });
+        beams.forEach((b, i) => { b.life--; if(b.owner==='OTHER') { const ang = Math.atan2(ME.y-b.sy, ME.x-b.sx); if(Math.abs(b.angle-ang)<0.12) { ME.vx += Math.cos(b.angle)*2.5; } } if(b.life<=0) beams.splice(i,1); });
     }
 
-    function drawPlayer(p, color, isMe) {
+    function drawPlayer(p, color, isMe, dead) {
+        if(dead) return;
         ctx.save(); ctx.translate(p.x, p.y);
         ctx.fillStyle="#fff"; ctx.font="14px 'Tiny5'"; ctx.textAlign="center"; ctx.fillText(p.name, 0, -35);
-        
-        // TAG OVERLAY
-        const pRole = (p === ME) ? (isHost ? "HOST" : "GUEST") : (isHost ? "GUEST" : "HOST");
-        ctx.strokeStyle = (gameMode === 'TAG' && itPlayer === pRole) ? "red" : "#000";
-        ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0, 0, p.r, 0, 6.3); ctx.stroke();
-        
+        ctx.strokeStyle = "#000"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, p.r, 0, 6.3); ctx.stroke();
         ctx.rotate(p.rot); ctx.fillStyle = color; ctx.beginPath(); ctx.arc(0, 0, p.r, 0, 6.3); ctx.fill();
-        ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(8,-5,3,0,6.3); ctx.fill(); ctx.beginPath(); ctx.arc(-8,-5,3,0,6.3); ctx.fill();
+        ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(6,-5,3,0,6.3); ctx.fill(); ctx.beginPath(); ctx.arc(-6,-5,3,0,6.3); ctx.fill();
         ctx.restore();
-        
-        if(gameMode !== 'TAG') {
-            ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(isMe ? myAngle : p.angle);
-            const s = p.swing ? Math.sin(p.swing * 0.4) * 50 : 0; ctx.rotate(s * Math.PI / 180);
-            ctx.fillStyle = color; ctx.strokeStyle="#000"; ctx.lineWidth=3; 
-            ctx.beginPath(); ctx.arc(38, 0, 9, 0, 6.3); ctx.fill(); ctx.stroke(); 
-            const itm = isMe ? (ME.inventory[selectedSlot]?.name) : p.item;
-            if(itm === 'SWORD') { ctx.fillStyle = "#aaa"; ctx.fillRect(45, -5, 60, 10); ctx.strokeRect(45, -5, 60, 10); }
-            else if(itm === 'STICK') { ctx.fillStyle = "#754"; ctx.fillRect(45, -4, 45, 8); ctx.strokeRect(45, -4, 45, 8); }
-            ctx.restore();
-        }
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(isMe ? myAngle : p.angle);
+        const s = p.swing ? Math.sin(p.swing * 0.4) * 50 : 0; ctx.rotate(s * Math.PI / 180);
+        ctx.fillStyle = color; ctx.strokeStyle="#000"; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(38, 0, 8, 0, 6.3); ctx.fill(); ctx.stroke(); 
+        const itm = isMe ? (ME.inventory[selectedSlot]?.name) : p.item;
+        if(itm === 'SWORD') { ctx.fillStyle = "#aaa"; ctx.fillRect(45, -5, 60, 10); ctx.strokeRect(45, -5, 60, 10); }
+        else if(itm === 'STICK') { ctx.fillStyle = "#754"; ctx.fillRect(45, -4, 45, 8); ctx.strokeRect(45, -4, 45, 8); }
+        ctx.restore();
     }
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         bgCtx.fillStyle = "#000"; bgCtx.fillRect(0,0,bgCanvas.width,bgCanvas.height);
         bgCtx.fillStyle = "#fff"; for(let i=0; i<40; i++) bgCtx.fillRect(Math.random()*bgCanvas.width, Math.random()*bgCanvas.height, 2, 2);
-        PLATFORMS.forEach(p => { ctx.fillStyle = "#643"; ctx.fillRect(p.x, p.y+12, p.w, p.h-12); ctx.fillStyle = "#4a2"; ctx.fillRect(p.x, p.y, p.w, 14); });
+
+        // ARENA TEXTURE
+        ctx.fillStyle = "#643"; ctx.fillRect(ARENA.x, ARENA.y+12, ARENA.w, ARENA.h-12); 
+        ctx.fillStyle = "#4a2"; ctx.fillRect(ARENA.x, ARENA.y, ARENA.w, 14); 
+
+        // LAVA
         for(let x=0; x<canvas.width; x+=30) { ctx.fillStyle = (x+lavaFrame*2)%60 < 30 ? "#f40" : "#d30"; ctx.fillRect(x, LAVA_Y, 30, 400); }
+
         projectiles.forEach(p => { ctx.fillStyle = p.type==='NUKE'?"#333":"#fff"; ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 6.3); ctx.fill(); });
         beams.forEach(b => { ctx.strokeStyle = "rgba(255,0,0,0.8)"; ctx.lineWidth = 12; ctx.beginPath(); ctx.moveTo(b.sx, b.sy); ctx.lineTo(b.sx + Math.cos(b.angle)*2500, b.sy + Math.sin(b.angle)*2500); ctx.stroke(); });
         explosions.forEach(e => { ctx.strokeStyle = "orange"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 6.3); ctx.stroke(); });
-        drawPlayer(ME, ME.color, true); drawPlayer(OTHER, OTHER.color, false);
+
+        drawPlayer(ME, ME.color, true, isDead); 
+        drawPlayer(OTHER, OTHER.color, false, oppDead);
     }
 
     function gameLoop() { update(); draw(); if(isGameRunning) requestAnimationFrame(gameLoop); }
     function updateUI() {
         document.getElementById('score-me-display').innerText = `ME: ${scores.me}`;
         document.getElementById('score-enemy-display').innerText = `${OTHER.name}: ${scores.enemy}`;
-        const m = Math.floor(matchTime/60), s = matchTime%60;
-        document.getElementById('match-timer').innerText = `${m}:${s<10?'0':''}${s}`;
         for(let i=0; i<3; i++) { 
             const slot = document.getElementById('slot-'+i); const itm = ME.inventory[i];
-            slot.innerHTML = `SLOT ${i+1}<br>${itm ? `${itm.name}<br>${itm.ammo===Infinity?'':itm.ammo}` : "EMPTY"}`;
+            slot.innerHTML = `SLOT ${i+1}<br>${itm ? `${itm.name}` : "EMPTY"}`;
             slot.className = (i === selectedSlot) ? "inv-slot inv-active" : "inv-slot";
         }
     }
