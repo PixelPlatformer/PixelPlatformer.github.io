@@ -12,6 +12,7 @@
         #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
         canvas#gameCanvas { display: none; background: #12121e; width: 100vw; height: 100vh; image-rendering: pixelated; }
 
+        /* --- LOADING SCREEN --- */
         #loading-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:1000; display:flex; flex-direction:column; align-items:center; justify-content:center; transition: opacity 0.5s; }
         .spinner { width: 50px; height: 50px; border: 5px solid #333; border-top: 5px solid #fff; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -46,9 +47,13 @@
     </style>
 </head>
 <body>
-    <div id="loading-overlay"><div class="spinner"></div><h1 class="neon-glow">INITIALIZING</h1></div>
-    <div id="version-tag" style="position:fixed; bottom:10px; left:10px; font-size:14px; color:rgba(255,255,255,0.3);">v1.18.0</div>
-    <canvas id="gameCanvas"></canvas>
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <h1 class="neon-glow">INITIALIZING</h1>
+    </div>
+
+    <div id="version-tag" style="position:fixed; bottom:10px; left:10px; font-size:14px; color:rgba(255,255,255,0.3);">v1.19.0</div>
+    <canvas id="bg-canvas"></canvas>
     
     <div id="main-menu" class="menu-screen">
         <h1 class="neon-glow" style="font-size: 55px; margin-bottom: 25px;">ARENA ROYALE</h1>
@@ -87,7 +92,19 @@
         <div id="inv-slot">EMPTY</div>
     </div>
 
+    <canvas id="gameCanvas"></canvas>
+
 <script>
+    // --- FORCE START LOADING BYPASS ---
+    function exitLoading() {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.style.display = 'none', 500);
+        }
+    }
+    setTimeout(exitLoading, 1500); // Brute force entry after 1.5s
+
     function generateFavicon() {
         const fCanvas = document.createElement('canvas'); fCanvas.width = 32; fCanvas.height = 32;
         const fCtx = fCanvas.getContext('2d');
@@ -119,8 +136,6 @@
         return name;
     }
 
-    window.onload = () => setTimeout(() => { document.getElementById('loading-overlay').style.opacity = '0'; setTimeout(() => document.getElementById('loading-overlay').style.display='none', 500); }, 1000);
-
     function buildMap() {
         PLATFORMS = [];
         for(let i=0; i<20; i++) PLATFORMS.push({ x: -800 + (i * 140), y: 500, w: 130, h: 60, contactTime: 0, falling: false, vy: 0 });
@@ -132,6 +147,7 @@
     window.addEventListener('resize', resize); resize();
     function randColor() { return `hsl(${Math.random() * 360}, 75%, 65%)`; }
 
+    // --- NETWORKING ---
     function setupHost() {
         ME.name = filterName(document.getElementById('player-name-input').value || "HOST");
         ME.color = randColor(); myId = Math.random().toString(36).substr(2, 4).toUpperCase();
@@ -165,10 +181,12 @@
 
     function updateLobbyList() {
         const list = document.getElementById('lobby-list-items');
+        if(!list) return;
         list.innerHTML = `<div class="lobby-player"><span>1. ${ME.name} (YOU)</span></div>`;
         let i = 2;
         for (let id in players) { list.innerHTML += `<div class="lobby-player"><span>${i}. ${players[id].name}</span>${isHost ? `<button class="btn-kick" onclick="kickPlayer('${id}')">[KICK]</button>` : ''}</div>`; i++; }
-        document.getElementById('start-btn').disabled = (i < 2); document.getElementById('start-btn').style.opacity = (i >= 2) ? "1" : "0.3";
+        const startBtn = document.getElementById('start-btn');
+        if(startBtn) { startBtn.disabled = (i < 2); startBtn.style.opacity = (i >= 2) ? "1" : "0.3"; }
     }
 
     function kickPlayer(id) { if(connections[id]) { connections[id].send({type:'KICK'}); connections[id].close(); delete connections[id]; delete players[id]; updateLobbyList(); } }
@@ -181,7 +199,7 @@
             if (data.type === 'VOID') { if(players[data.id]) players[data.id].dead = true; if(isHost) checkMatchEnd(); }
             if (data.type === 'HIT' && data.target === 'me') { ME.vx = data.vx; ME.vy = data.vy; }
             if (data.type === 'FREEZE') isFrozen = data.val;
-            if (data.type === 'PLAT_STATE') { let p = PLATFORMS[data.idx]; p.contactTime = data.time; p.falling = data.fall; p.vy = data.vy; p.y = data.py; }
+            if (data.type === 'PLAT_STATE') { let p = PLATFORMS[data.idx]; if(p) { p.contactTime = data.time; p.falling = data.fall; p.vy = data.vy; p.y = data.py; } }
         });
     }
 
@@ -191,13 +209,10 @@
         document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none');
         document.getElementById('ui-layer').style.display = 'block'; 
         canvas.style.display = 'block';
-        isGameRunning = true; 
-        isDead = false; // FORCE RESCUE
-        buildMap(); 
-        syncRound(1); 
+        isGameRunning = true; buildMap(); syncRound(1); 
         requestAnimationFrame(gameLoop);
         setInterval(() => {
-            if(!peer) return;
+            if(!peer || !peer.id) return;
             const s = { x: ME.x, y: ME.y, rot: ME.rot, item: ME.item?.name || 'NOTHING', angle: myAngle, name: ME.name, color: ME.color, swing: ME.swing, dead: isDead, invis: cheatInvis };
             for(let id in connections) connections[id].send({ type: 'UPDATE', id: peer.id, state: s });
         }, 30);
@@ -206,8 +221,8 @@
     function syncRound(num) {
         currentRound = num; isDead = false; warmupTime = 180; buildMap();
         const spawnX = [-300, 100, 500, 900];
-        const myIdx = isHost ? 0 : Object.keys(players).length;
-        ME.x = spawnX[myIdx % 4]; ME.y = -200; ME.vx = 0; ME.vy = 0;
+        let myIdx = isHost ? 0 : Object.keys(players).length;
+        ME.x = spawnX[myIdx % 4]; ME.y = 100; ME.vx = 0; ME.vy = 0;
         for(let id in players) players[id].dead = false;
         document.getElementById('victory-screen').style.display = 'none'; updateUI();
     }
@@ -317,8 +332,17 @@
     }
 
     let lastTime = performance.now();
-    function gameLoop() { let n = performance.now(); let dt = (n - lastTime) / 1000; lastTime = n; update(dt); draw(); if(isGameRunning) requestAnimationFrame(gameLoop); }
-    function showMenu(id) { document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none'); document.getElementById(id).style.display = 'block'; }
+    function gameLoop() { 
+        let n = performance.now(); let dt = (n - lastTime) / 1000; lastTime = n; 
+        update(dt); draw(); 
+        if(isGameRunning) requestAnimationFrame(gameLoop); 
+    }
+
+    function showMenu(id) { 
+        document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none'); 
+        const m = document.getElementById(id);
+        if(m) m.style.display = 'block'; 
+    }
     function updateUI() { document.getElementById('round-num').innerText = currentRound; document.getElementById('inv-slot').innerText = ME.item ? ME.item.name : "EMPTY"; }
 </script>
 </body>
