@@ -47,8 +47,8 @@
 </head>
 <body>
     <div id="loading-overlay"><div class="spinner"></div><h1 class="neon-glow">INITIALIZING</h1></div>
-    <div id="version-tag" style="position:fixed; bottom:10px; left:10px; font-size:14px; color:rgba(255,255,255,0.3);">v1.17.0</div>
-    <canvas id="bg-canvas"></canvas>
+    <div id="version-tag" style="position:fixed; bottom:10px; left:10px; font-size:14px; color:rgba(255,255,255,0.3);">v1.18.0</div>
+    <canvas id="gameCanvas"></canvas>
     
     <div id="main-menu" class="menu-screen">
         <h1 class="neon-glow" style="font-size: 55px; margin-bottom: 25px;">ARENA ROYALE</h1>
@@ -87,15 +87,13 @@
         <div id="inv-slot">EMPTY</div>
     </div>
 
-    <canvas id="gameCanvas"></canvas>
-
 <script>
-    // --- BRANDING ---
     function generateFavicon() {
         const fCanvas = document.createElement('canvas'); fCanvas.width = 32; fCanvas.height = 32;
         const fCtx = fCanvas.getContext('2d');
         fCtx.fillStyle = '#fff'; fCtx.beginPath(); fCtx.arc(16, 16, 14, 0, 6.3); fCtx.fill();
-        fCtx.fillStyle = '#000'; fCtx.beginPath(); fCtx.arc(12, 12, 3, 0, 6.3); fCtx.fill(); fCtx.beginPath(); fCtx.arc(20, 12, 3, 0, 6.3); fCtx.fill();
+        fCtx.fillStyle = '#000'; fCtx.beginPath(); fCtx.arc(12, 12, 3, 0, 6.3); fCtx.fill();
+        fCtx.beginPath(); fCtx.arc(20, 12, 3, 0, 6.3); fCtx.fill();
         document.getElementById('favicon').href = fCanvas.toDataURL();
     }
     generateFavicon();
@@ -169,10 +167,7 @@
         const list = document.getElementById('lobby-list-items');
         list.innerHTML = `<div class="lobby-player"><span>1. ${ME.name} (YOU)</span></div>`;
         let i = 2;
-        for (let id in players) {
-            list.innerHTML += `<div class="lobby-player"><span>${i}. ${players[id].name}</span>${isHost ? `<button class="btn-kick" onclick="kickPlayer('${id}')">[KICK]</button>` : ''}</div>`;
-            i++;
-        }
+        for (let id in players) { list.innerHTML += `<div class="lobby-player"><span>${i}. ${players[id].name}</span>${isHost ? `<button class="btn-kick" onclick="kickPlayer('${id}')">[KICK]</button>` : ''}</div>`; i++; }
         document.getElementById('start-btn').disabled = (i < 2); document.getElementById('start-btn').style.opacity = (i >= 2) ? "1" : "0.3";
     }
 
@@ -194,9 +189,15 @@
 
     function startGame() {
         document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none');
-        document.getElementById('ui-layer').style.display = 'block'; canvas.style.display = 'block';
-        isGameRunning = true; buildMap(); syncRound(1); requestAnimationFrame(gameLoop);
+        document.getElementById('ui-layer').style.display = 'block'; 
+        canvas.style.display = 'block';
+        isGameRunning = true; 
+        isDead = false; // FORCE RESCUE
+        buildMap(); 
+        syncRound(1); 
+        requestAnimationFrame(gameLoop);
         setInterval(() => {
+            if(!peer) return;
             const s = { x: ME.x, y: ME.y, rot: ME.rot, item: ME.item?.name || 'NOTHING', angle: myAngle, name: ME.name, color: ME.color, swing: ME.swing, dead: isDead, invis: cheatInvis };
             for(let id in connections) connections[id].send({ type: 'UPDATE', id: peer.id, state: s });
         }, 30);
@@ -206,7 +207,7 @@
         currentRound = num; isDead = false; warmupTime = 180; buildMap();
         const spawnX = [-300, 100, 500, 900];
         const myIdx = isHost ? 0 : Object.keys(players).length;
-        ME.x = spawnX[myIdx % 4]; ME.y = 100; ME.vx = 0; ME.vy = 0;
+        ME.x = spawnX[myIdx % 4]; ME.y = -200; ME.vx = 0; ME.vy = 0;
         for(let id in players) players[id].dead = false;
         document.getElementById('victory-screen').style.display = 'none'; updateUI();
     }
@@ -243,7 +244,7 @@
 
     function roll() { ME.vx = (mouseX > ME.x ? 1 : -1) * 18; rollTimer = 110; }
 
-    function update() {
+    function update(dt) {
         if (!isGameRunning) return;
         magmaFrame++;
         const ov = document.getElementById('warmup-overlay');
@@ -251,7 +252,7 @@
             warmupTime--; 
             ov.style.display = 'block'; ov.innerText = Math.ceil(warmupTime/60);
             if(warmupTime === 0) { ov.innerText = "GO!"; setTimeout(()=>ov.style.display='none', 500); }
-            return; // EXIT HERE SO NO GRAVITY APPLIES DURING WARMUP
+            return;
         }
 
         if(!isDead && !isFrozen) {
@@ -262,9 +263,7 @@
                 ME.vy = 0; ME.vx = 0;
             } else {
                 if (keys['a']) { ME.vx = -MOVE_SPD; ME.rot -= 0.1; } else if (keys['d']) { ME.vx = MOVE_SPD; ME.rot += 0.1; } else { ME.vx *= 0.88; }
-                
-                ME.vy += GRAVITY; 
-                ME.x += ME.vx; ME.y += ME.vy;
+                ME.vy += GRAVITY; ME.x += ME.vx; ME.y += ME.vy;
                 ME.grounded = false;
                 PLATFORMS.forEach((p, idx) => {
                     if(p.falling) { p.vy += 0.2; p.y += p.vy; }
@@ -317,7 +316,8 @@
         for(let id in players) if(!players[id].dead) drawPlayer(players[id], players[id].color, false);
     }
 
-    function gameLoop() { update(); draw(); if(isGameRunning) requestAnimationFrame(gameLoop); }
+    let lastTime = performance.now();
+    function gameLoop() { let n = performance.now(); let dt = (n - lastTime) / 1000; lastTime = n; update(dt); draw(); if(isGameRunning) requestAnimationFrame(gameLoop); }
     function showMenu(id) { document.querySelectorAll('.menu-screen').forEach(e => e.style.display = 'none'); document.getElementById(id).style.display = 'block'; }
     function updateUI() { document.getElementById('round-num').innerText = currentRound; document.getElementById('inv-slot').innerText = ME.item ? ME.item.name : "EMPTY"; }
 </script>
